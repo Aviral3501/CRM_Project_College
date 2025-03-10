@@ -21,7 +21,7 @@ const allowedOrigins = [
 ];
 
 // Use CORS middleware
-app.use(cors({
+app.use(cors({ 
     origin: allowedOrigins,
     credentials: true // Allow credentials (cookies, authorization headers, etc.)
 }));
