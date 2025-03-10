@@ -9,6 +9,8 @@ import {
 	sendWelcomeEmail,
 } from "../mailtrap/emails.js"; // Import email sending functions
 import { User } from "../models/user.model.js"; // Import User model
+import transporter from "../nodemailer/nodemailer.js";
+import { VERIFICATION_EMAIL_TEMPLATE } from "../mailtrap/emailTemplates.js";
 
 // Signup function to register a new user
 export const signup = async (req, res) => {
@@ -49,6 +51,7 @@ export const signup = async (req, res) => {
         // Send verification email to the user
 		await sendVerificationEmail(user.email, verificationToken);
 
+
 		res.status(201).json({
 			success: true,
 			message: "User created successfully",
@@ -64,27 +67,22 @@ export const signup = async (req, res) => {
 
 // Verify email function to confirm user email
 export const verifyEmail = async (req, res) => {
-	const { code } = req.body; // Get verification code from request body
+	const { code } = req.body;
 	try {
-		// Find user by verification token
 		const user = await User.findOne({
 			verificationToken: code,
-			verificationTokenExpiresAt: { $gt: Date.now() }, // Check if token is still valid
+			verificationTokenExpiresAt: { $gt: Date.now() },
 		});
 
 		if (!user) {
 			return res.status(400).json({ success: false, message: "Invalid or expired verification code" });
 		}
 
-		// Mark user as verified
 		user.isVerified = true;
-		user.verificationToken = undefined; // Clear verification token
-		user.verificationTokenExpiresAt = undefined; // Clear expiration time
-
-        // Save updated user information
+		user.verificationToken = undefined;
+		user.verificationTokenExpiresAt = undefined;
 		await user.save();
 
-		// Send welcome email to the user
 		await sendWelcomeEmail(user.email, user.name);
 
 		res.status(200).json({
@@ -92,12 +90,12 @@ export const verifyEmail = async (req, res) => {
 			message: "Email verified successfully",
 			user: {
 				...user._doc,
-				password: undefined, // Exclude password from response
+				password: undefined,
 			},
 		});
 	} catch (error) {
-		console.log("error in verifyEmail ", error); 
-		res.status(500).json({ success: false, message: "Server error" }); 
+		console.log("error in verifyEmail ", error);
+		res.status(500).json({ success: false, message: "Server error" });
 	}
 };
 
