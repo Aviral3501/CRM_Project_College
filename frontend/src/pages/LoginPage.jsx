@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Mail, Lock, Loader } from "lucide-react";
+import { Mail, Lock, Loader, Building } from "lucide-react";
 import { Link } from "react-router-dom";
 import Input from "../components/Input";
 import { useAuthStore } from "../store/authStore";
@@ -8,12 +8,13 @@ import { useAuthStore } from "../store/authStore";
 const LoginPage = () => {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
+	const [organizationName, setOrganizationName] = useState("");
 
 	const { login, isLoading, error } = useAuthStore();
 
 	const handleLogin = async (e) => {
 		e.preventDefault();
-		await login(email, password);
+		await login(email, password, organizationName);
 	};
 
 	return (
@@ -30,6 +31,14 @@ const LoginPage = () => {
 
 				<form onSubmit={handleLogin}>
 					<Input
+						icon={Building}
+						type='text'
+						placeholder='Organization Name'
+						value={organizationName}
+						onChange={(e) => setOrganizationName(e.target.value)}
+					/>
+
+					<Input
 						icon={Mail}
 						type='email'
 						placeholder='Email Address'
@@ -45,9 +54,12 @@ const LoginPage = () => {
 						onChange={(e) => setPassword(e.target.value)}
 					/>
 
-					<div className='flex items-center mb-6'>
+					<div className='flex items-center justify-between mb-6'>
 						<Link to='/forgot-password' className='text-sm text-green-400 hover:underline'>
 							Forgot password?
+						</Link>
+						<Link to='/admin/login' className='text-sm text-green-400 hover:underline'>
+							Admin Login
 						</Link>
 					</div>
 					{error && <p className='text-red-500 font-semibold mb-2'>{error}</p>}
@@ -59,7 +71,7 @@ const LoginPage = () => {
 						type='submit'
 						disabled={isLoading}
 					>
-						{isLoading ? <Loader className='w-6 h-6 animate-spin  mx-auto' /> : "Login"}
+						{isLoading ? <Loader className='w-6 h-6 animate-spin mx-auto' /> : "Login"}
 					</motion.button>
 				</form>
 			</div>

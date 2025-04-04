@@ -7,12 +7,15 @@ import EmailVerificationPage from "./pages/EmailVerificationPage";
 import DashboardPage from "./pages/DashboardPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import AdminLoginPage from "./pages/admin/AdminLoginPage";
+import AdminSignupPage from "./pages/admin/AdminSignupPage";
 
 import LoadingSpinner from "./components/LoadingSpinner";
 
 import { Toaster } from "react-hot-toast";
 import { useAuthStore } from "./store/authStore";
 import { useEffect } from "react";
+import MainContent from "./pages/MainContent";
 
 // protect routes that require authentication
 const ProtectedRoute = ({ children }) => {
@@ -29,11 +32,33 @@ const ProtectedRoute = ({ children }) => {
 	return children;
 };
 
-// redirect authenticated users to the home page
+// protect routes that require admin authentication
+const ProtectedAdminRoute = ({ children }) => {
+	const { isAuthenticated, user } = useAuthStore();
+
+	if (!isAuthenticated) {
+		return <Navigate to='/admin/login' replace />;
+	}
+
+	if (!user.isVerified) {
+		return <Navigate to='/verify-email' replace />;
+	}
+
+	if (user.role !== 'admin') {
+		return <Navigate to='/' replace />;
+	}
+
+	return children;
+};
+
+// redirect authenticated users to the appropriate dashboard
 const RedirectAuthenticatedUser = ({ children }) => {
 	const { isAuthenticated, user } = useAuthStore();
 
 	if (isAuthenticated && user.isVerified) {
+		if (user.role === 'admin') {
+			return <Navigate to='/admin/dashboard' replace />;
+		}
 		return <Navigate to='/' replace />;
 	}
 
@@ -59,6 +84,7 @@ function App() {
 			<FloatingShape color='bg-lime-500' size='w-32 h-32' top='40%' left='-10%' delay={2} />
 
 			<Routes>
+				{/* Employee Routes */}
 				<Route
 					path='/'
 					element={
@@ -83,6 +109,43 @@ function App() {
 						</RedirectAuthenticatedUser>
 					}
 				/>
+
+				{/* Admin Routes */}
+				<Route
+					path='/admin/login'
+					element={
+						<RedirectAuthenticatedUser>
+							<AdminLoginPage />
+						</RedirectAuthenticatedUser>
+					}
+				/>
+				<Route
+					path='/admin/signup'
+					element={
+						<RedirectAuthenticatedUser>
+							<AdminSignupPage />
+						</RedirectAuthenticatedUser>
+					}
+				/>
+				<Route
+					path='/admin/dashboard'
+					element={
+						<ProtectedAdminRoute>
+							<DashboardPage /> {/* You might want to create a separate AdminDashboardPage */}
+						</ProtectedAdminRoute>
+					}
+				/>
+
+				<Route
+					path='/main/'
+					element={
+						<ProtectedAdminRoute>
+							<MainContent/> 
+						</ProtectedAdminRoute>
+					}
+				/>
+
+				{/* Common Routes */}
 				<Route path='/verify-email' element={<EmailVerificationPage />} />
 				<Route
 					path='/forgot-password'
@@ -92,7 +155,6 @@ function App() {
 						</RedirectAuthenticatedUser>
 					}
 				/>
-
 				<Route
 					path='/reset-password/:token'
 					element={
@@ -101,6 +163,7 @@ function App() {
 						</RedirectAuthenticatedUser>
 					}
 				/>
+
 				{/* catch all routes */}
 				<Route path='*' element={<Navigate to='/' replace />} />
 			</Routes>

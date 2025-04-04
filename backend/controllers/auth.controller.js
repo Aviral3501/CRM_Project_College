@@ -11,57 +11,87 @@ import {
 import { User } from "../models/user.model.js"; // Import User model
 import transporter from "../nodemailer/nodemailer.js";
 import { VERIFICATION_EMAIL_TEMPLATE } from "../mailtrap/emailTemplates.js";
+import { Organization } from "../models/org.model.js";
+
+// Helper function to generate 6-digit OTP
+const generateOTP = () => {
+	return Math.floor(100000 + Math.random() * 900000).toString();
+};
 
 // Signup function to register a new user
 export const signup = async (req, res) => {
-	const { email, password, name } = req.body; // Destructure request body
-
 	try {
-		// Check if all required fields are provided
-		if (!email || !password || !name) {
-			throw new Error("All fields are required");
+		const { name, email, password, organizationName } = req.body;
+
+		console.log("Attempting to find organization:", organizationName); // Debug log
+
+		// Check if organization exists using exact name match first
+		const organization = await Organization.findOne({ name: organizationName });
+		
+		if (!organization) {
+			console.log("No organization found with name:", organizationName); // Debug log
+			return res.status(400).json({
+				success: false,
+				message: `Organization "${organizationName}" not found. Please check the organization name and try again.`
+			});
 		}
 
-        // Check if user already exists
-		const userAlreadyExists = await User.findOne({ email });
-		console.log("userAlreadyExists", userAlreadyExists);
-
-		if (userAlreadyExists) {
-			return res.status(400).json({ success: false, message: "User already exists" });
+		// Check if user already exists
+		const existingUser = await User.findOne({ email });
+		if (existingUser) {
+			return res.status(400).json({
+				success: false,
+				message: "Email already registered"
+			});
 		}
 
-        // Hash the password for security
-		const hashedPassword = await bcryptjs.hash(password, 10);
-		const verificationToken = Math.floor(100000 + Math.random() * 900000).toString(); // Generate verification token
+		// Hash password
+		const salt = await bcryptjs.genSalt(10);
+		const hashedPassword = await bcryptjs.hash(password, salt);
 
-		const user = new User({
+		// Generate 6-digit OTP
+		const verificationToken = generateOTP();
+		const verificationTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+		// Create user
+		const user = await User.create({
+			name,
 			email,
 			password: hashedPassword,
-			name,
+			role: "employee",
+			organization: organization._id,
 			verificationToken,
-			verificationTokenExpiresAt: Date.now() + 24 * 60 * 60 * 1000, // Token expires in 24 hours
+			verificationTokenExpiresAt,
+			createdBy: organization.admin
 		});
 
-        // Save the new user to the database and then create a token for the client 
-		await user.save();
+		// Add user to organization's employees array
+		organization.employees.push(user._id);
+		await organization.save();
 
-		// Generate JWT token and set it in a cookie
-		generateTokenAndSetCookie(res, user._id);
+		// Generate token and set cookie
+		const token = generateTokenAndSetCookie(res, user._id);
 
-        // Send verification email to the user
-		await sendVerificationEmail(user.email, verificationToken);
-
+		// Send verification email
+		await sendVerificationEmail(email, verificationToken);
 
 		res.status(201).json({
 			success: true,
-			message: "User created successfully",
+			message: "Account created successfully",
 			user: {
-				...user._doc,
-				password: undefined, // Exclude password from response
-			},
+				id: user._id,
+				name: user.name,
+				email: user.email,
+				organization: organization.name
+			}
 		});
+
 	} catch (error) {
-		res.status(400).json({ success: false, message: error.message }); // Handle errors
+		console.error("Error in signup: ", error);
+		res.status(500).json({
+			success: false,
+			message: "Error creating account"
+		});
 	}
 };
 
@@ -69,13 +99,17 @@ export const signup = async (req, res) => {
 export const verifyEmail = async (req, res) => {
 	const { code } = req.body;
 	try {
+		// Find user with matching OTP
 		const user = await User.findOne({
 			verificationToken: code,
 			verificationTokenExpiresAt: { $gt: Date.now() },
 		});
 
 		if (!user) {
-			return res.status(400).json({ success: false, message: "Invalid or expired verification code" });
+			return res.status(400).json({ 
+				success: false, 
+				message: "Invalid or expired OTP" 
+			});
 		}
 
 		user.isVerified = true;
@@ -217,5 +251,133 @@ export const checkAuth = async (req, res) => {
 	} catch (error) {
 		console.log("Error in checkAuth ", error); 
 		res.status(400).json({ success: false, message: error.message }); 
+	}
+};
+
+export const adminSignup = async (req, res) => {
+	try {
+		const { 
+			organizationName, 
+			industry, 
+			location, 
+			website,
+			adminName,
+			adminEmail,
+			adminPassword 
+		} = req.body;
+
+		// Check if organization already exists
+		const existingOrg = await Organization.findOne({ name: organizationName });
+		if (existingOrg) {
+			return res.status(400).json({ 
+				success: false, 
+				message: "Organization already exists" 
+			});
+		}
+
+		// Check if admin email already exists
+		const existingAdmin = await User.findOne({ email: adminEmail });
+		if (existingAdmin) {
+			return res.status(400).json({ 
+				success: false, 
+				message: "Email already registered" 
+			});
+		}
+
+		// Create organization first
+		let organization;
+		try {
+			organization = await Organization.create({
+				name: organizationName,
+				industry,
+				address: location,
+				website
+			});
+		} catch (error) {
+			console.error("Error creating organization:", error);
+			return res.status(500).json({
+				success: false,
+				message: "Error creating organization"
+			});
+		}
+
+		// Hash password
+		const salt = await bcryptjs.genSalt(10);
+		const hashedPassword = await bcryptjs.hash(adminPassword, salt);
+
+		// Generate 6-digit OTP
+		const verificationToken = generateOTP();
+		const verificationTokenExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes expiry
+
+		// Create admin user
+		let admin;
+		try {
+			admin = await User.create({
+				name: adminName,
+				email: adminEmail,
+				password: hashedPassword,
+				role: "admin",
+				verificationToken,
+				verificationTokenExpiresAt,
+				organization: organization._id
+			});
+		} catch (error) {
+			// If admin creation fails, delete the organization
+			await Organization.findByIdAndDelete(organization._id);
+			console.error("Error creating admin:", error);
+			return res.status(500).json({
+				success: false,
+				message: "Error creating admin account"
+			});
+		}
+
+		// Update organization with admin reference
+		try {
+			organization.admin = admin._id;
+			organization.employees = [admin._id];
+			organization.createdBy = admin._id;
+			await organization.save();
+		} catch (error) {
+			// If organization update fails, clean up both records
+			await User.findByIdAndDelete(admin._id);
+			await Organization.findByIdAndDelete(organization._id);
+			console.error("Error updating organization:", error);
+			return res.status(500).json({
+				success: false,
+				message: "Error linking admin to organization"
+			});
+		}
+
+		// Generate token and set cookie
+		const token = generateTokenAndSetCookie(res, admin._id);
+
+		// Send verification email with OTP
+		try {
+			await sendVerificationEmail(adminEmail, verificationToken);
+		} catch (error) {
+			console.error("Error sending verification email:", error);
+			// Continue with the response even if email fails
+		}
+
+		res.status(201).json({
+			success: true,
+			message: "Organization and admin account created successfully. Please check your email for verification OTP.",
+			organization: {
+				id: organization.org_id,
+				name: organization.name
+			},
+			admin: {
+				id: admin._id,
+				name: admin.name,
+				email: admin.email
+			}
+		});
+
+	} catch (error) {
+		console.error("Error in adminSignup:", error);
+		res.status(500).json({ 
+			success: false, 
+			message: "Error creating organization and admin account" 
+		});
 	}
 };

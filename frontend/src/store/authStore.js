@@ -13,16 +13,40 @@ export const useAuthStore = create((set) => ({
 	isCheckingAuth: true,
 	message: null,
 
-	signup: async (email, password, name) => {
+	// Employee signup
+	signup: async ({ email, password, name, organizationName }) => {
 		set({ isLoading: true, error: null });
 		try {
-			const response = await axios.post(`${API_URL}/signup`, { email, password, name });
-			set({ user: response.data.user, isAuthenticated: true, isLoading: false });
+			const response = await axios.post(`${API_URL}/signup`, { 
+				email, 
+				password, 
+				name,
+				organizationName
+			});
+			if (response.data.success) {
+				set({ user: response.data.user, isAuthenticated: true, isLoading: false });
+				return response.data;
+			}
 		} catch (error) {
 			set({ error: error.response.data.message || "Error signing up", isLoading: false });
 			throw error;
 		}
 	},
+
+	// Admin signup
+	adminSignup: async (adminData) => {
+		set({ isLoading: true, error: null });
+		try {
+			const response = await axios.post(`${API_URL}/admin/signup`, adminData);
+			set({ user: response.data.admin, isAuthenticated: true, isLoading: false });
+			return response.data;
+		} catch (error) {
+			set({ error: error.response.data.message || "Error creating organization", isLoading: false });
+			throw error;
+		}
+	},
+
+	// Common login for both admin and employee
 	login: async (email, password) => {
 		set({ isLoading: true, error: null });
 		try {
@@ -33,7 +57,25 @@ export const useAuthStore = create((set) => ({
 				error: null,
 				isLoading: false,
 			});
+			return response.data;
+		} catch (error) {
+			set({ error: error.response?.data?.message || "Error logging in", isLoading: false });
+			throw error;
+		}
+	},
 
+	// Admin login
+	adminLogin: async (email, password) => {
+		set({ isLoading: true, error: null });
+		try {
+			const response = await axios.post(`${API_URL}/admin/login`, { email, password });
+			set({
+				isAuthenticated: true,
+				user: response.data.user,
+				error: null,
+				isLoading: false,
+			});
+			return response.data;
 		} catch (error) {
 			set({ error: error.response?.data?.message || "Error logging in", isLoading: false });
 			throw error;
