@@ -1,21 +1,33 @@
-import { Navigate, Route, Routes } from "react-router-dom";
-import FloatingShape from "./components/FloatingShape";
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from "react";
+import { Toaster } from "react-hot-toast";
 
-import SignUpPage from "./pages/SignupPage";
+// Layout and UI Components
+import Layout from './components/Layout';
+import LoadingSpinner from "./components/LoadingSpinner";
+
+// Auth Pages
 import LoginPage from "./pages/LoginPage";
+import SignUpPage from "./pages/SignupPage";
 import EmailVerificationPage from "./pages/EmailVerificationPage";
-import DashboardPage from "./pages/DashboardPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import AdminLoginPage from "./pages/admin/AdminLoginPage";
 import AdminSignupPage from "./pages/admin/AdminSignupPage";
 
-import LoadingSpinner from "./components/LoadingSpinner";
+// Main App Pages
+import Dashboard from './pages/Dashboard';
+import Leads from './pages/sales/Leads';
+import Pipeline from './pages/sales/Pipeline';
+import Customers from './pages/sales/Customers';
+import Quotes from './pages/sales/Quotes';
+import Projects from './pages/projects/Projects';
+import Tasks from './pages/tasks/Tasks';
+import Employees from './pages/employees/Employees';
+import Analytics from './pages/analytics/Analytics';
+import Notifications from './pages/notifications/Notifications';
 
-import { Toaster } from "react-hot-toast";
 import { useAuthStore } from "./store/authStore";
-import { useEffect } from "react";
-import MainContent from "./pages/MainContent";
 
 // protect routes that require authentication
 const ProtectedRoute = ({ children }) => {
@@ -32,40 +44,18 @@ const ProtectedRoute = ({ children }) => {
 	return children;
 };
 
-// protect routes that require admin authentication
-const ProtectedAdminRoute = ({ children }) => {
-	const { isAuthenticated, user } = useAuthStore();
-
-	if (!isAuthenticated) {
-		return <Navigate to='/admin/login' replace />;
-	}
-
-	if (!user.isVerified) {
-		return <Navigate to='/verify-email' replace />;
-	}
-
-	if (user.role !== 'admin') {
-		return <Navigate to='/' replace />;
-	}
-
-	return children;
-};
-
-// redirect authenticated users to the appropriate dashboard
+// redirect authenticated users
 const RedirectAuthenticatedUser = ({ children }) => {
 	const { isAuthenticated, user } = useAuthStore();
 
 	if (isAuthenticated && user.isVerified) {
-		if (user.role === 'admin') {
-			return <Navigate to='/admin/dashboard' replace />;
-		}
-		return <Navigate to='/' replace />;
+		return <Navigate to='/dashboard' replace />;
 	}
 
 	return children;
 };
 
-function App() {
+const App = () => {
 	const { isCheckingAuth, checkAuth } = useAuthStore();
 
 	useEffect(() => {
@@ -75,101 +65,55 @@ function App() {
 	if (isCheckingAuth) return <LoadingSpinner />;
 
 	return (
-		<div
-			className='min-h-screen bg-gradient-to-br
-    from-gray-900 via-green-900 to-emerald-900 flex items-center justify-center relative overflow-hidden'
-		>
-			<FloatingShape color='bg-green-500' size='w-64 h-64' top='-5%' left='10%' delay={0} />
-			<FloatingShape color='bg-emerald-500' size='w-48 h-48' top='70%' left='80%' delay={5} />
-			<FloatingShape color='bg-lime-500' size='w-32 h-32' top='40%' left='-10%' delay={2} />
-
+		<>
 			<Routes>
-				{/* Employee Routes */}
-				<Route
-					path='/'
-					element={
-						<ProtectedRoute>
-							<DashboardPage />
-						</ProtectedRoute>
-					}
-				/>
-				<Route
-					path='/signup'
-					element={
-						<RedirectAuthenticatedUser>
-							<SignUpPage />
-						</RedirectAuthenticatedUser>
-					}
-				/>
-				<Route
-					path='/login'
-					element={
-						<RedirectAuthenticatedUser>
-							<LoginPage />
-						</RedirectAuthenticatedUser>
-					}
-				/>
+				{/* Public Auth Routes */}
+				<Route path="/login" element={
+					<RedirectAuthenticatedUser>
+						<LoginPage />
+					</RedirectAuthenticatedUser>
+				} />
+				<Route path="/signup" element={
+					<RedirectAuthenticatedUser>
+						<SignUpPage />
+					</RedirectAuthenticatedUser>
+				} />
+				<Route path="/admin/login" element={
+					<RedirectAuthenticatedUser>
+						<AdminLoginPage />
+					</RedirectAuthenticatedUser>
+				} />
+				<Route path="/admin/signup" element={
+					<RedirectAuthenticatedUser>
+						<AdminSignupPage />
+					</RedirectAuthenticatedUser>
+				} />
+				<Route path="/verify-email" element={<EmailVerificationPage />} />
+				<Route path="/forgot-password" element={<ForgotPasswordPage />} />
+				<Route path="/reset-password/:token" element={<ResetPasswordPage />} />
 
-				{/* Admin Routes */}
-				<Route
-					path='/admin/login'
-					element={
-						<RedirectAuthenticatedUser>
-							<AdminLoginPage />
-						</RedirectAuthenticatedUser>
-					}
-				/>
-				<Route
-					path='/admin/signup'
-					element={
-						<RedirectAuthenticatedUser>
-							<AdminSignupPage />
-						</RedirectAuthenticatedUser>
-					}
-				/>
-				<Route
-					path='/admin/dashboard'
-					element={
-						<ProtectedAdminRoute>
-							<DashboardPage /> {/* You might want to create a separate AdminDashboardPage */}
-						</ProtectedAdminRoute>
-					}
-				/>
-
-				<Route
-					path='/main/'
-					element={
-						<ProtectedAdminRoute>
-							<MainContent/> 
-						</ProtectedAdminRoute>
-					}
-				/>
-
-				{/* Common Routes */}
-				<Route path='/verify-email' element={<EmailVerificationPage />} />
-				<Route
-					path='/forgot-password'
-					element={
-						<RedirectAuthenticatedUser>
-							<ForgotPasswordPage />
-						</RedirectAuthenticatedUser>
-					}
-				/>
-				<Route
-					path='/reset-password/:token'
-					element={
-						<RedirectAuthenticatedUser>
-							<ResetPasswordPage />
-						</RedirectAuthenticatedUser>
-					}
-				/>
-
-				{/* catch all routes */}
-				<Route path='*' element={<Navigate to='/' replace />} />
+				{/* Protected Routes - All inside Layout */}
+				<Route path="/" element={
+					<ProtectedRoute>
+						<Layout />
+					</ProtectedRoute>
+				}>
+					<Route index element={<Navigate to="/dashboard" replace />} />
+					<Route path="dashboard" element={<Dashboard />} />
+					<Route path="sales/leads" element={<Leads />} />
+					<Route path="sales/pipeline" element={<Pipeline />} />
+					<Route path="sales/customers" element={<Customers />} />
+					<Route path="sales/quotes" element={<Quotes />} />
+					<Route path="projects" element={<Projects />} />
+					<Route path="tasks" element={<Tasks />} />
+					<Route path="employees" element={<Employees />} />
+					<Route path="analytics" element={<Analytics />} />
+					<Route path="notifications" element={<Notifications />} />
+				</Route>
 			</Routes>
 			<Toaster />
-		</div>
+		</>
 	);
-}
+};
 
 export default App;
