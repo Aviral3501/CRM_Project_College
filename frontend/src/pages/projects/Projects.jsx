@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import  Card  from '../../components/ui/Card';
-import { Plus, Calendar, Users, Clock, MoreVertical, X } from 'lucide-react';
+import { Plus, Calendar, Users, Clock, MoreVertical, X, AlertTriangle, Edit2, Trash2 } from 'lucide-react';
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend, Tooltip, ComposedChart, CartesianGrid, XAxis, YAxis, Bar, Line, Scatter } from 'recharts';
+import { motion } from 'framer-motion';
 
 const employeeOptions = [
     { id: 1, name: 'John Doe', role: 'Frontend Developer' },
@@ -47,6 +48,9 @@ const Projects = () => {
     ]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedProject, setSelectedProject] = useState(null);
+    const [deleteProject, setDeleteProject] = useState(null);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [openMenuId, setOpenMenuId] = useState(null);
 
     const handleCreateProject = (newProject) => {
         setProjects(prev => [...prev, newProject]);
@@ -81,6 +85,34 @@ const Projects = () => {
         });
     };
 
+    const handleDeleteClick = (project) => {
+        setDeleteProject(project);
+    };
+
+    const handleProceedToDelete = () => {
+        setShowDeleteConfirm(true);
+    };
+
+    const handleConfirmDelete = () => {
+        handleDeleteProject(deleteProject.id);
+        setShowDeleteConfirm(false);
+        setDeleteProject(null);
+    };
+
+    // Add this useEffect to handle clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (!event.target.closest('.project-menu')) {
+                setOpenMenuId(null);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
+
     return (
         <div className="p-6">
             <div className="flex justify-between items-center mb-6">
@@ -106,16 +138,50 @@ const Projects = () => {
                                 <h3 className="text-lg font-semibold">{project.name}</h3>
                                 <p className="text-sm text-gray-500">{project.description}</p>
                             </div>
-                            <div className="relative">
+                            <div className="relative project-menu">
                                 <button 
-                                    onClick={() => {
-                                        setSelectedProject(project);
-                                        setIsModalOpen(true);
-                                    }}
-                                    className="text-gray-400 hover:text-gray-600"
+                                    onClick={() => setOpenMenuId(openMenuId === project.id ? null : project.id)}
+                                    className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
                                 >
                                     <MoreVertical size={20} />
                                 </button>
+                                {openMenuId === project.id && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: -10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -10 }}
+                                        transition={{ duration: 0.15 }}
+                                        className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-10"
+                                    >
+                                        <div className="py-1">
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedProject(project);
+                                                    setIsModalOpen(true);
+                                                    setOpenMenuId(null);
+                                                }}
+                                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                                            >
+                                                <span className="text-gray-400">
+                                                    <Edit2 size={16} />
+                                                </span>
+                                                Edit Project
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    handleDeleteClick(project);
+                                                    setOpenMenuId(null);
+                                                }}
+                                                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                            >
+                                                <span className="text-red-400">
+                                                    <Trash2 size={16} />
+                                                </span>
+                                                Delete Project
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                )}
                             </div>
                         </div>
 
@@ -254,6 +320,23 @@ const Projects = () => {
                     }
                 }}
                 project={selectedProject}
+            />
+
+            <DeleteProjectModal
+                isOpen={!!deleteProject && !showDeleteConfirm}
+                onClose={() => setDeleteProject(null)}
+                project={deleteProject}
+                onProceed={handleProceedToDelete}
+            />
+
+            <DeleteConfirmationDialog
+                isOpen={showDeleteConfirm}
+                onClose={() => {
+                    setShowDeleteConfirm(false);
+                    setDeleteProject(null);
+                }}
+                project={deleteProject}
+                onConfirm={handleConfirmDelete}
             />
         </div>
     );
@@ -585,6 +668,126 @@ const ProjectModal = ({ isOpen, onClose, onSubmit, project = null }) => {
                     </div>
                 </form>
             </div>
+        </div>
+    );
+};
+
+// Delete Project Modal
+const DeleteProjectModal = ({ isOpen, onClose, project, onProceed }) => {
+    return (
+        <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-40 ${isOpen ? '' : 'hidden'}`}>
+            <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-white rounded-lg w-full max-w-lg p-6"
+            >
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-2xl font-semibold text-red-600">Delete Project</h2>
+                    <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+                        <X size={24} />
+                    </button>
+                </div>
+
+                <div className="space-y-4">
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                        <h3 className="font-semibold text-lg mb-2">{project?.name}</h3>
+                        <p className="text-gray-600 mb-3">{project?.description}</p>
+                        
+                        <div className="space-y-2">
+                            <div className="flex items-center text-sm text-gray-600">
+                                <Calendar size={16} className="mr-2" />
+                                Deadline: {new Date(project?.deadline).toLocaleDateString()}
+                            </div>
+                            <div className="flex items-center text-sm text-gray-600">
+                                <Users size={16} className="mr-2" />
+                                Team: {project?.team.join(', ')}
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className={`px-2 py-1 text-xs rounded-full ${
+                                    project?.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                                    project?.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
+                                    'bg-yellow-100 text-yellow-800'
+                                }`}>
+                                    {project?.status}
+                                </span>
+                                <span className={`px-2 py-1 text-xs rounded-full ${
+                                    project?.priority === 'High' ? 'bg-red-100 text-red-800' :
+                                    'bg-orange-100 text-orange-800'
+                                }`}>
+                                    {project?.priority}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3">
+                        <button
+                            onClick={onClose}
+                            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={onProceed}
+                            className="px-4 py-2 text-white bg-red-500 rounded-md hover:bg-red-600"
+                        >
+                            Proceed to Delete
+                        </button>
+                    </div>
+                </div>
+            </motion.div>
+        </div>
+    );
+};
+
+// Delete Confirmation Dialog
+const DeleteConfirmationDialog = ({ isOpen, onClose, project, onConfirm }) => {
+    const [confirmText, setConfirmText] = useState('');
+    
+    return (
+        <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 ${isOpen ? '' : 'hidden'}`}>
+            <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-white rounded-lg w-full max-w-md p-6"
+            >
+                <div className="flex justify-center text-red-500 mb-4">
+                    <AlertTriangle size={48} />
+                </div>
+                
+                <h3 className="text-xl font-bold text-center mb-2">Confirm Project Deletion</h3>
+                <p className="text-gray-600 text-center mb-6">
+                    This action cannot be undone. Please type <span className="font-semibold">{project?.name}</span> to confirm deletion.
+                </p>
+
+                <div className="space-y-4">
+                    <input
+                        type="text"
+                        value={confirmText}
+                        onChange={(e) => setConfirmText(e.target.value)}
+                        placeholder="Type project name to confirm"
+                        className="w-full p-2 border border-gray-300 rounded-md focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                    />
+
+                    <div className="flex justify-center gap-4">
+                        <button
+                            onClick={onClose}
+                            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={() => onConfirm()}
+                            disabled={confirmText !== project?.name}
+                            className="px-4 py-2 text-white bg-red-500 rounded-md hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Delete Project
+                        </button>
+                    </div>
+                </div>
+            </motion.div>
         </div>
     );
 };
