@@ -56,55 +56,80 @@ export const getUserTasks = async (req, res) => {
 export const createTask = async (req, res) => {
     try {
         const { 
-            assigned_to_user_id, // User ID of assignee
-            project_id,          // Project ID
             title,
+            assigned_to_user_id,
+            project_id,
             description,
             priority,
-            subtasks           // Array of subtask objects
+            subtasks
         } = req.body;
 
-        // Find assignee by user_id
-        const assignee = await User.findOne({ user_id: assigned_to_user_id });
-        if (!assignee) {
-            return res.status(404).json({
+        // Validate required field
+        if (!title || !title.trim()) {
+            return res.status(400).json({
                 success: false,
-                message: "Assignee not found"
+                message: "Task title is required"
             });
         }
 
-        // Find project by project_id
-        const project = await Project.findOne({ project_id });
-        if (!project) {
-            return res.status(404).json({
-                success: false,
-                message: "Project not found"
-            });
+        // Find assignee if provided
+        let assignee = null;
+        if (assigned_to_user_id) {
+            assignee = await User.findOne({ user_id: assigned_to_user_id });
+            if (!assignee) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Assignee not found"
+                });
+            }
+        }
+
+        // Find project if provided
+        let project = null;
+        if (project_id) {
+            project = await Project.findOne({ project_id });
+            if (!project) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Project not found"
+                });
+            }
         }
 
         // Create main task
-        const task = await Task.create({
-            title,
-            description,
-            priority,
-            assignedTo: assignee._id,
-            project: project._id,
-            organization: assignee.organization,
-            createdBy: req.user._id // Assuming req.user is set by auth middleware
-        });
+        const taskData = {
+            title: title.trim(),
+            description: description?.trim(),
+            priority: priority || 'Medium',
+            createdBy: req.user._id
+        };
+
+        // Add optional fields if they exist
+        if (assignee) {
+            taskData.assignedTo = assignee._id;
+            taskData.organization = assignee.organization;
+        }
+        if (project) {
+            taskData.project = project._id;
+        }
+
+        const task = await Task.create(taskData);
 
         // Create subtasks if provided
         if (subtasks && subtasks.length > 0) {
             const createdSubtasks = await Promise.all(
                 subtasks.map(async (subtask) => {
-                    const subtaskAssignee = await User.findOne({ 
-                        user_id: subtask.assigned_to_user_id 
-                    });
+                    let subtaskAssignee = null;
+                    if (subtask.assigned_to_user_id) {
+                        subtaskAssignee = await User.findOne({ 
+                            user_id: subtask.assigned_to_user_id 
+                        });
+                    }
 
                     return Subtask.create({
                         title: subtask.title,
                         task: task._id,
-                        assignedTo: subtaskAssignee?._id || assignee._id,
+                        assignedTo: subtaskAssignee?._id || assignee?._id,
                         createdBy: req.user._id
                     });
                 })

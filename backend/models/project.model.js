@@ -1,28 +1,88 @@
 import mongoose from "mongoose";
 import Counter from "./counter.model.js"; // Import the Counter model
 
-const memberSchema = new mongoose.Schema({
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // Reference to the User
-    role: {
-        type: String,
-        enum: ["admin", "editor", "viewer"], // Define roles for project members
-        default: "viewer", // Default role
+const subtaskSchema = new mongoose.Schema({
+    title: { type: String, required: true },
+    description: String,
+    status: { 
+        type: String, 
+        enum: ['Pending', 'In Progress', 'Completed'],
+        default: 'Pending'
     },
-    permissions: [{ type: String }], // Array of permissions (e.g., ["edit_tasks", "view_reports"])
+    assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    dueDate: Date
 });
 
-const projectSchema = new mongoose.Schema(
-    {
-        project_id: { type: String, unique: true }, // Custom ID for the project
-        title: { type: String, required: true },
-        description: { type: String },
-        organization: { type: mongoose.Schema.Types.ObjectId, ref: "Organization", required: true },
-        members: [memberSchema], // Array of members with their roles and permissions
-        createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-        updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+const taskSchema = new mongoose.Schema({
+    title: { type: String, required: true },
+    description: String,
+    status: { 
+        type: String, 
+        enum: ['Pending', 'In Progress', 'Completed'],
+        default: 'Pending'
     },
-    { timestamps: true }
-);
+    priority: { 
+        type: String, 
+        enum: ['Low', 'Medium', 'High', 'Urgent'],
+        default: 'Medium'
+    },
+    assignedTo: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    dueDate: Date,
+    subtasks: [subtaskSchema]
+});
+
+const projectSchema = new mongoose.Schema({
+    project_id: { type: String, unique: true },
+    name: {
+        type: String,
+        required: true,
+        trim: true
+    },
+    description: {
+        type: String,
+        trim: true
+    },
+    status: {
+        type: String,
+        enum: ['Not Started', 'In Progress', 'On Hold', 'Completed', 'Cancelled'],
+        default: 'Not Started'
+    },
+    priority: {
+        type: String,
+        enum: ['Low', 'Medium', 'High', 'Urgent'],
+        default: 'Medium'
+    },
+    deadline: {
+        type: Date
+    },
+    team: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }],
+    tasks: [taskSchema],
+    progress: {
+        type: Number,
+        min: 0,
+        max: 100,
+        default: 0
+    },
+    organization: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Organization',
+        required: true
+    },
+    createdBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+    },
+    updatedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }
+}, {
+    timestamps: true
+});
 
 // Middleware to generate project_id
 projectSchema.pre("save", async function (next) {
@@ -37,4 +97,20 @@ projectSchema.pre("save", async function (next) {
     next();
 });
 
-export const Project = mongoose.model("Project", projectSchema);
+// Calculate project progress based on tasks
+projectSchema.methods.calculateProgress = function() {
+    if (!this.tasks || this.tasks.length === 0) return 0;
+    
+    const completedTasks = this.tasks.filter(task => task.status === 'Completed').length;
+    return Math.round((completedTasks / this.tasks.length) * 100);
+};
+
+// Update progress before saving
+projectSchema.pre('save', function(next) {
+    if (this.tasks && this.tasks.length > 0) {
+        this.progress = this.calculateProgress();
+    }
+    next();
+});
+
+export const Project = mongoose.model('Project', projectSchema);

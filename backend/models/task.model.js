@@ -9,10 +9,11 @@ const taskSchema = new mongoose.Schema(
 		status: { type: String, enum: ["Pending", "In Progress", "Completed"], default: "Pending" },
 		priority: { type: String, enum: ["Low", "Medium", "High"], default: "Medium" },
 		assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-		project: { type: mongoose.Schema.Types.ObjectId, ref: "Project", required: true },
-		organization: { type: mongoose.Schema.Types.ObjectId, ref: "Organization", required: true },
+		project: { type: mongoose.Schema.Types.ObjectId, ref: "Project" }, // Made optional
+		organization: { type: mongoose.Schema.Types.ObjectId, ref: "Organization" }, // Made optional
 		createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 		updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+		subtasks: [{ type: mongoose.Schema.Types.ObjectId, ref: "Subtask" }]
 	},
 	{ timestamps: true }
 );
@@ -55,8 +56,6 @@ subtaskSchema.pre("save", async function (next) {
 	}
 	next();
 });
-
-
 
 export const Subtask = mongoose.model("Subtask", subtaskSchema);
 

@@ -1,13 +1,16 @@
 import express from "express";
-import { getUserTasks, createTask } from "../controllers/task.controller.js";
-import { verifyToken } from "../middleware/verifyToken.js";
+import { createTask, getUserTasks } from "../controllers/task.controller.js";
+import { protectRoute } from "../middleware/protectRoute.js";
 
 const router = express.Router();
 
-// Changed from GET to POST
-router.post("/fetch-tasks", verifyToken, getUserTasks);
+// All routes are protected and require authentication
+router.use(protectRoute);
 
-// Create task route (already POST)
-router.post("/create", verifyToken, createTask);
+// POST /api/get-task - Get all tasks for the logged-in user
+router.post("/get-task", getUserTasks);
+
+// POST /api/create-task - Create a new task
+router.post("/create-task", createTask);
 
 export default router; 
