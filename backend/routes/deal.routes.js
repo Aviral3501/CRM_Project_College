@@ -4,6 +4,8 @@ import { Lead } from '../models/lead.model.js';
 
 const router = express.Router();
 
+console.log("Deal routes loaded"); // Debug log
+
 // Get all deals for an organization
 router.post('/get-deals', async (req, res) => {
     try {

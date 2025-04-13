@@ -10,12 +10,14 @@ import authRoutes from "./routes/auth.routes.js";
 import taskRoutes from "./routes/task.routes.js";
 import projectRoutes from "./routes/project.routes.js";
 import orgUserRoutes from "./routes/orgUser.routes.js";
+import employeeRoutes from "./routes/employee.routes.js";
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const __dirname = path.resolve();
+
 
 // Define allowed origins
 const allowedOrigins = [
@@ -32,11 +34,14 @@ app.use(cors({
 app.use(express.json()); // allows us to parse incoming requests:req.body
 app.use(cookieParser()); // allows us to parse incoming cookies
 
+
 // API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/org-users", orgUserRoutes);
+app.use("/api/employees", employeeRoutes);
+
 
 if (process.env.NODE_ENV === "production") {
 	app.use(express.static(path.join(__dirname, "/frontend/dist")));
@@ -46,7 +51,16 @@ if (process.env.NODE_ENV === "production") {
 	});
 }
 
+// 404 handler
+app.use((req, res) => {
+	console.log(`[404] Route not found: ${req.method} ${req.originalUrl}`);
+	res.status(404).json({
+		success: false,
+		message: 'Route not found'
+	});
+});
+
 app.listen(PORT, () => {
 	connectDB();
-	console.log("Server is running on port: ", PORT);
+	console.log(`Server is running on port: ${PORT}`);
 });

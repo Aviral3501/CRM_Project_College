@@ -4,9 +4,12 @@ import { Organization } from '../models/org.model.js';
 
 const router = express.Router();
 
+console.log("User routes loaded"); // Debug log
+
 // Get all users for an organization
 router.post('/get-users', async (req, res) => {
     try {
+        console.log("get-users route hit"); // Debug log
         const { organization_id } = req.body;
         
         const users = await User.find({ organization: organization_id })

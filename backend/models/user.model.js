@@ -66,12 +66,31 @@ const userSchema = new mongoose.Schema(
 // Add middleware to generate user_id
 userSchema.pre("save", async function (next) {
   if (this.isNew) {
-    const counter = await Counter.findOneAndUpdate(
-      { _id: "userId" },
-      { $inc: { sequenceValue: 1 } },
-      { new: true, upsert: true }
-    );
-    this.user_id = `UID${String(counter.sequenceValue).padStart(9, '0')}`;
+    try {
+      const counter = await Counter.findOneAndUpdate(
+        { _id: "userId" },
+        { $inc: { sequenceValue: 1 } },
+        { new: true, upsert: true }
+      );
+      
+      // Ensure the sequence value is at least 1
+      const sequenceValue = Math.max(counter.sequenceValue, 1);
+      this.user_id = `UID${String(sequenceValue).padStart(9, '0')}`;
+      
+      // Verify uniqueness
+      const existingUser = await this.constructor.findOne({ user_id: this.user_id });
+      if (existingUser) {
+        // If user_id exists, increment counter and try again
+        await Counter.findOneAndUpdate(
+          { _id: "userId" },
+          { $inc: { sequenceValue: 1 } },
+          { new: true }
+        );
+        this.user_id = `UID${String(sequenceValue + 1).padStart(9, '0')}`;
+      }
+    } catch (error) {
+      return next(error);
+    }
   }
   next();
 });

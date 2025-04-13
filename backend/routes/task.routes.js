@@ -11,6 +11,8 @@ const router = express.Router();
 // All routes are protected and require authentication
 router.use(protectRoute);
 
+
+
 // Validate organization_id and user_id
 const validateIds = async (req, res, next) => {
     const { organization_id, user_id } = req.body;
