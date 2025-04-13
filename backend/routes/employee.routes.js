@@ -13,7 +13,6 @@ router.use(protectRoute);
 // Validate organization_id and user_id
 const validateIds = async (req, res, next) => {
     try {
-        console.log("Validating request in employee routes:", req.path);
         const { organization_id, user_id } = req.body;
         
         if (!organization_id) {
@@ -62,13 +61,11 @@ const validateIds = async (req, res, next) => {
 
 // Get all employees for an organization
 router.post('/get-employees', validateIds, async (req, res) => {
-    console.log("Handling /list request");
     try {
         const employees = await User.find({ organization: req.organization._id })
             .select('-password -resetPasswordToken -resetPasswordExpiresAt -verificationToken -verificationTokenExpiresAt')
             .populate('organization', 'name industry');
 
-        console.log(`Found ${employees.length} employees`);
 
         res.json({
             success: true,
