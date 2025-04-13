@@ -3,6 +3,7 @@ import { Deal } from '../models/deal.model.js';
 import { Organization } from '../models/organization.model.js';
 import { User } from '../models/user.model.js';
 import { Client } from '../models/client.model.js';
+import { Lead } from '../models/lead.model.js';
 
 const router = express.Router();
 
@@ -67,7 +68,7 @@ router.post('/get-pipeline', async (req, res) => {
 // Create a new deal in pipeline
 router.post('/create-pipeline', async (req, res) => {
     try {
-        const { organization_id, user_id, ...dealData } = req.body;
+        const { organization_id, user_id, lead_id, assignedTo_id, ...dealData } = req.body;
         
         // Find organization by org_id
         const organization = await Organization.findOne({ org_id: organization_id });
@@ -87,6 +88,27 @@ router.post('/create-pipeline', async (req, res) => {
             });
         }
 
+        // Find lead by lead_id
+        const lead = await Lead.findOne({ lead_id: lead_id });
+        if (!lead) {
+            return res.status(404).json({
+                success: false,
+                message: 'Lead not found'
+            });
+        }
+
+        // Find assigned user by user_id
+        let assignedTo = null;
+        if (assignedTo_id) {
+            assignedTo = await User.findOne({ user_id: assignedTo_id });
+            if (!assignedTo) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Assigned user not found'
+                });
+            }
+        }
+
         // Find client by client_id if provided
         let client = null;
         if (dealData.client_id) {
@@ -104,6 +126,8 @@ router.post('/create-pipeline', async (req, res) => {
             organization: organization._id,
             createdBy: user._id,
             updatedBy: user._id,
+            lead: lead._id,
+            assignedTo: assignedTo?._id,
             client: client?._id
         });
 

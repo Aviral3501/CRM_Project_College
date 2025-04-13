@@ -8,10 +8,14 @@ const dealSchema = new mongoose.Schema(
 		amount: { type: Number, required: true },
 		stage: { type: String, enum: ["Proposal", "Negotiation", "Closed Won", "Closed Lost"], default: "Proposal" },
 		lead: { type: mongoose.Schema.Types.ObjectId, ref: "Lead", required: true },
+		client: { type: mongoose.Schema.Types.ObjectId, ref: "Client" },
 		assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 		organization: { type: mongoose.Schema.Types.ObjectId, ref: "Organization", required: true },
 		createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 		updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+		progress: { type: Number, default: 0 },
+		notes: String,
+		expectedCloseDate: Date
 	},
 	{ timestamps: true }
 );
