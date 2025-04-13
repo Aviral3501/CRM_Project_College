@@ -22,7 +22,7 @@ const Sidebar = () => {
         {
             title: "Sales",
             icon: <DollarSign size={20} />,
-            path: "/sales",
+            path: "/sales/leads",
             subItems: [
                 { title: "Leads", path: "/sales/leads" },
                 { title: "Pipeline", path: "/sales/pipeline" },

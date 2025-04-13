@@ -1,13 +1,58 @@
 import express from "express";
 import { protectRoute } from "../middleware/protectRoute.js";
 import { Project } from "../models/project.model.js";
+import { Organization } from "../models/org.model.js";
 import { User } from "../models/user.model.js";
 import mongoose from "mongoose";
+import { Task } from '../models/task.model.js';
 
 const router = express.Router();
 
-// All routes are protected
+// All routes are protected and require authentication
 router.use(protectRoute);
+
+// Validate organization_id and user_id
+const validateIds = async (req, res, next) => {
+    const { organization_id, user_id } = req.body;
+    
+    if (!organization_id) {
+        return res.status(400).json({
+            success: false,
+            message: "organization_id is required"
+        });
+    }
+    
+    if (!user_id) {
+        return res.status(400).json({
+            success: false,
+            message: "user_id is required"
+        });
+    }
+
+    // Find organization by org_id
+    const organization = await Organization.findOne({ org_id: organization_id });
+    if (!organization) {
+        return res.status(404).json({
+            success: false,
+            message: "Organization not found"
+        });
+    }
+
+    // Find user by user_id
+    const user = await User.findOne({ user_id });
+    if (!user) {
+        return res.status(404).json({
+            success: false,
+            message: "User not found"
+        });
+    }
+
+    // Add organization and user to request
+    req.organization = organization;
+    req.user = user;
+    
+    next();
+};
 
 // Helper function to convert custom IDs to MongoDB ObjectIds
 const convertCustomIdsToObjectIds = async (data) => {
@@ -66,172 +111,293 @@ const convertCustomIdsToObjectIds = async (data) => {
     return data;
 };
 
-// POST /api/projects/list - Get all projects for an organization
-router.post("/list", async (req, res) => {
+// Get all projects for an organization
+router.post('/get-projects', validateIds, async (req, res) => {
     try {
-        const { organization_id } = req.body;
+        const projects = await Project.find({ organization: req.organization._id })
+            .populate('team', 'name')
+            .populate('createdBy', 'name')
+            .populate('updatedBy', 'name');
 
-        // Find organization by org_id
-        const org = await mongoose.model("Organization").findOne({ org_id: organization_id });
-        if (!org) {
-            return res.status(404).json({
-                success: false,
-                message: "Organization not found"
-            });
-        }
-
-        const projects = await Project.find({ organization: org._id })
-            .populate('team', 'user_id name email role')
-            .populate('tasks.assignedTo', 'user_id name email role')
-            .populate('tasks.subtasks.assignedTo', 'user_id name email role')
-            .sort({ createdAt: -1 });
-
-        res.status(200).json({
+        res.json({
             success: true,
-            projects
+            data: projects.map(project => ({
+                project_id: project.project_id,
+                name: project.name,
+                description: project.description,
+                status: project.status,
+                deadline: project.deadline?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+                team: project.team.map(member => member.name),
+                progress: project.progress,
+                priority: project.priority,
+                tasks: project.tasks || []
+            }))
         });
     } catch (error) {
-        console.error("Error fetching projects:", error);
         res.status(500).json({
             success: false,
-            message: "Error fetching projects"
+            message: error.message
         });
     }
 });
 
-// POST /api/projects/create - Create a new project
-router.post("/create", async (req, res) => {
-            // MINIMAL FIELDS REQUIRED (ONLY RQUIRED FIELDS)
-
-        // {
-        //     "name": "Website Redesign",
-        //     "organization_id": "ORG000000001"
-        // }
+// Create a new project
+router.post('/create-project', validateIds, async (req, res) => {
     try {
-        const projectData = { ...req.body };
-
-        // {
-        //     "name": "Website Redesign",
-        //     "description": "Complete overhaul of company website",
-        //     "status": "Not Started",
-        //     "priority": "High",
-        //     "deadline": "2024-04-30",
-        //     "team": ["UID000000001", "UID000000002"],
-        //     "tasks": [
-        //         {
-        //             "title": "Design Homepage",
-        //             "description": "Create new homepage design",
-        //             "status": "Pending",
-        //             "priority": "High",
-        //             "assignedTo": ["UID000000001"],
-        //             "dueDate": "2024-03-15",
-        //             "subtasks": [
-        //                 {
-        //                     "title": "Create wireframes",
-        //                     "description": "Design wireframes for homepage",
-        //                     "status": "Pending",
-        //                     "assignedTo": "UID000000001",
-        //                     "dueDate": "2024-03-10"
-        //                 }
-        //             ]
-        //         }
-        //     ],
-        //     "organization_id": "ORG000000001"
-        // }
-
-
-
-        // Convert custom IDs to MongoDB ObjectIds
-        const convertedData = await convertCustomIdsToObjectIds(projectData);
+        const { team, tasks, ...projectData } = req.body;
         
-        // Add createdBy from the authenticated user
-        convertedData.createdBy = req.user._id;
+        // Find team members by user_id
+        let teamRefs = [];
+        if (team && team.length > 0) {
+            teamRefs = await Promise.all(team.map(async (userId) => {
+                const user = await User.findOne({ user_id: userId });
+                if (!user) {
+                    throw new Error(`User with ID ${userId} not found`);
+                }
+                return user._id;
+            }));
+        }
 
-        const project = await Project.create(convertedData);
+        // Process tasks if they exist
+        let processedTasks = [];
+        if (tasks && tasks.length > 0) {
+            processedTasks = await Promise.all(tasks.map(async (task) => {
+                // Process assignedTo for main task
+                let assignedToRefs = [];
+                if (task.assignedTo && task.assignedTo.length > 0) {
+                    assignedToRefs = await Promise.all(task.assignedTo.map(async (userId) => {
+                        const user = await User.findOne({ user_id: userId });
+                        if (!user) {
+                            throw new Error(`User with ID ${userId} not found`);
+                        }
+                        return user._id;
+                    }));
+                }
 
-        const populatedProject = await Project.findById(project._id)
-            .populate('team', 'user_id name email role')
-            .populate('tasks.assignedTo', 'user_id name email role')
-            .populate('tasks.subtasks.assignedTo', 'user_id name email role');
+                // Process subtasks
+                let processedSubtasks = [];
+                if (task.subtasks && task.subtasks.length > 0) {
+                    processedSubtasks = await Promise.all(task.subtasks.map(async (subtask) => {
+                        let subtaskAssignedTo = null;
+                        if (subtask.assignedTo) {
+                            const user = await User.findOne({ user_id: subtask.assignedTo });
+                            if (!user) {
+                                throw new Error(`User with ID ${subtask.assignedTo} not found`);
+                            }
+                            subtaskAssignedTo = user._id;
+                        }
 
-        res.status(201).json({
+                        return {
+                            ...subtask,
+                            assignedTo: subtaskAssignedTo
+                        };
+                    }));
+                }
+
+                return {
+                    ...task,
+                    assignedTo: assignedToRefs,
+                    subtasks: processedSubtasks
+                };
+            }));
+        }
+
+        const project = new Project({
+            ...projectData,
+            organization: req.organization._id,
+            team: teamRefs,
+            tasks: processedTasks,
+            createdBy: req.user._id,
+            updatedBy: req.user._id
+        });
+
+        await project.save();
+
+        res.json({
             success: true,
-            project: populatedProject
+            data: {
+                project_id: project.project_id,
+                name: project.name,
+                description: project.description,
+                status: project.status,
+                deadline: project.deadline?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+                team: teamRefs.map(member => member.name),
+                progress: project.progress,
+                priority: project.priority,
+                tasks: project.tasks || []
+            }
         });
     } catch (error) {
-        console.error("Error creating project:", error);
         res.status(500).json({
             success: false,
-            message: "Error creating project",
-            errors: error.errors
+            message: error.message
         });
     }
 });
 
-// POST /api/projects/update - Update a project
-router.post("/update", async (req, res) => {
+// Update a project
+router.post('/update-project', validateIds, async (req, res) => {
     try {
-        const { project_id, ...updateData } = req.body;
+        const { project_id, team, tasks, ...updateData } = req.body;
         
-        // Find project by project_id
-        const existingProject = await Project.findOne({ project_id });
-        if (!existingProject) {
-            return res.status(404).json({
+        if (!project_id) {
+            return res.status(400).json({
                 success: false,
-                message: "Project not found"
+                message: "project_id is required"
             });
         }
-        
-        // Convert custom IDs to MongoDB ObjectIds
-        const convertedData = await convertCustomIdsToObjectIds(updateData);
-        
-        // Add updatedBy from the authenticated user
-        convertedData.updatedBy = req.user._id;
 
-        const project = await Project.findByIdAndUpdate(
-            existingProject._id,
-            convertedData,
+        // Find team members by user_id if team is provided
+        let teamRefs = null;
+        if (team && team.length > 0) {
+            teamRefs = await Promise.all(team.map(async (userId) => {
+                const user = await User.findOne({ user_id: userId });
+                if (!user) {
+                    throw new Error(`User with ID ${userId} not found`);
+                }
+                return user._id;
+            }));
+        }
+
+        // Process tasks if they exist
+        let processedTasks = null;
+        if (tasks && tasks.length > 0) {
+            processedTasks = await Promise.all(tasks.map(async (task) => {
+                // Process assignedTo for main task
+                let assignedToRefs = [];
+                if (task.assignedTo && task.assignedTo.length > 0) {
+                    assignedToRefs = await Promise.all(task.assignedTo.map(async (userId) => {
+                        const user = await User.findOne({ user_id: userId });
+                        if (!user) {
+                            throw new Error(`User with ID ${userId} not found`);
+                        }
+                        return user._id;
+                    }));
+                }
+
+                // Process subtasks
+                let processedSubtasks = [];
+                if (task.subtasks && task.subtasks.length > 0) {
+                    processedSubtasks = await Promise.all(task.subtasks.map(async (subtask) => {
+                        let subtaskAssignedTo = null;
+                        if (subtask.assignedTo) {
+                            const user = await User.findOne({ user_id: subtask.assignedTo });
+                            if (!user) {
+                                throw new Error(`User with ID ${subtask.assignedTo} not found`);
+                            }
+                            subtaskAssignedTo = user._id;
+                        }
+
+                        return {
+                            title: subtask.title,
+                            description: subtask.description,
+                            status: subtask.status,
+                            assignedTo: subtaskAssignedTo,
+                            dueDate: subtask.dueDate
+                        };
+                    }));
+                }
+
+                return {
+                    title: task.title,
+                    description: task.description,
+                    status: task.status,
+                    priority: task.priority,
+                    assignedTo: assignedToRefs,
+                    dueDate: task.dueDate,
+                    subtasks: processedSubtasks
+                };
+            }));
+        }
+
+        const project = await Project.findOneAndUpdate(
+            { project_id, organization: req.organization._id },
+            { 
+                ...updateData,
+                team: teamRefs || undefined,
+                tasks: processedTasks || undefined,
+                updatedBy: req.user._id 
+            },
             { new: true }
-        ).populate('team', 'user_id name email role')
-         .populate('tasks.assignedTo', 'user_id name email role')
-         .populate('tasks.subtasks.assignedTo', 'user_id name email role');
-
-        res.status(200).json({
-            success: true,
-            project
-        });
-    } catch (error) {
-        console.error("Error updating project:", error);
-        res.status(500).json({
-            success: false,
-            message: "Error updating project"
-        });
-    }
-});
-
-// POST /api/projects/delete - Delete a project
-router.post("/delete", async (req, res) => {
-    try {
-        const { project_id } = req.body;
-
-        const project = await Project.findOneAndDelete({ project_id });
+        ).populate('team', 'name')
+         .populate('tasks.assignedTo', 'name')
+         .populate('tasks.subtasks.assignedTo', 'name');
 
         if (!project) {
             return res.status(404).json({
                 success: false,
-                message: "Project not found"
+                message: 'Project not found'
             });
         }
 
-        res.status(200).json({
+        res.json({
             success: true,
-            message: "Project deleted successfully"
+            data: {
+                project_id: project.project_id,
+                name: project.name,
+                description: project.description,
+                status: project.status,
+                deadline: project.deadline?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+                team: project.team.map(member => member.name),
+                progress: project.progress,
+                priority: project.priority,
+                tasks: project.tasks.map(task => ({
+                    title: task.title,
+                    description: task.description,
+                    status: task.status,
+                    priority: task.priority,
+                    assignedTo: task.assignedTo.map(user => user.name),
+                    dueDate: task.dueDate,
+                    subtasks: task.subtasks.map(subtask => ({
+                        title: subtask.title,
+                        description: subtask.description,
+                        status: subtask.status,
+                        assignedTo: subtask.assignedTo?.name || null,
+                        dueDate: subtask.dueDate
+                    }))
+                }))
+            }
         });
     } catch (error) {
-        console.error("Error deleting project:", error);
         res.status(500).json({
             success: false,
-            message: "Error deleting project"
+            message: error.message
+        });
+    }
+});
+
+// Delete a project
+router.post('/delete-project', validateIds, async (req, res) => {
+    try {
+        const { project_id } = req.body;
+        
+        if (!project_id) {
+            return res.status(400).json({
+                success: false,
+                message: "project_id is required"
+            });
+        }
+
+        const project = await Project.findOneAndDelete({
+            project_id,
+            organization: req.organization._id
+        });
+
+        if (!project) {
+            return res.status(404).json({
+                success: false,
+                message: 'Project not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Project deleted successfully'
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
         });
     }
 });

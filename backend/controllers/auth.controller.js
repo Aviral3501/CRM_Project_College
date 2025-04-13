@@ -80,6 +80,8 @@ export const signup = async (req, res) => {
 			message: "Account created successfully",
 			user: {
 				id: user._id,
+				user_id: user.user_id,
+				organization_id: organization.org_id,
 				name: user.name,
 				email: user.email,
 				organization: organization.name
@@ -155,11 +157,16 @@ export const login = async (req, res) => {
         // Save user info
 		await user.save();
 
+		// Get organization details
+		const organization = await Organization.findById(user.organization);
+
 		res.status(200).json({
 			success: true,
 			message: "Logged in successfully",
 			user: {
 				...user._doc,
+				user_id: user.user_id,
+				organization_id: organization.org_id,
 				password: undefined, // Exclude password from response
 			},
 		});
@@ -368,6 +375,8 @@ export const adminSignup = async (req, res) => {
 			},
 			admin: {
 				id: admin._id,
+				user_id: admin.user_id,
+				organization_id: organization.org_id,
 				name: admin.name,
 				email: admin.email
 			}
