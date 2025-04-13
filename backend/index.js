@@ -11,6 +11,8 @@ import taskRoutes from "./routes/task.routes.js";
 import projectRoutes from "./routes/project.routes.js";
 import orgUserRoutes from "./routes/orgUser.routes.js";
 import employeeRoutes from "./routes/employee.routes.js";
+import leadRoutes from "./routes/lead.routes.js";
+import clientRoutes from "./routes/client.routes.js";
 
 dotenv.config();
 
@@ -41,6 +43,8 @@ app.use("/api/tasks", taskRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/org-users", orgUserRoutes);
 app.use("/api/employees", employeeRoutes);
+app.use("/api/leads", leadRoutes);
+app.use("/api/clients", clientRoutes);
 
 
 if (process.env.NODE_ENV === "production") {
