@@ -13,6 +13,7 @@ import orgUserRoutes from "./routes/orgUser.routes.js";
 import employeeRoutes from "./routes/employee.routes.js";
 import leadRoutes from "./routes/lead.routes.js";
 import clientRoutes from "./routes/client.routes.js";
+import pipelineRoutes from "./routes/pipeline.routes.js";
 
 dotenv.config();
 
@@ -45,6 +46,7 @@ app.use("/api/org-users", orgUserRoutes);
 app.use("/api/employees", employeeRoutes);
 app.use("/api/leads", leadRoutes);
 app.use("/api/clients", clientRoutes);
+app.use("/api/pipeline", pipelineRoutes);
 
 
 if (process.env.NODE_ENV === "production") {
