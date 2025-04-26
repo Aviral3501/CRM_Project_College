@@ -1,69 +1,287 @@
-import { useState, useEffect } from 'react';
-import  Card  from '../../components/ui/Card';
-import { Plus, Calendar, Users, Clock, MoreVertical, X, AlertTriangle, Edit2, Trash2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import Card from '../../components/ui/Card';
+import { Plus, Calendar, Users, Clock, MoreVertical, X, AlertTriangle, Edit2, Trash2, Search } from 'lucide-react';
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend, Tooltip, ComposedChart, CartesianGrid, XAxis, YAxis, Bar, Line, Scatter } from 'recharts';
 import { motion } from 'framer-motion';
+import axios from 'axios';
+import { useUser } from '../../context/UserContext';
+import { toast } from 'react-hot-toast';
 
-const employeeOptions = [
-    { id: 1, name: 'John Doe', role: 'Frontend Developer' },
-    { id: 2, name: 'Jane Smith', role: 'Backend Developer' },
-    { id: 3, name: 'Mike Johnson', role: 'UI/UX Designer' },
-    { id: 4, name: 'Sarah Wilson', role: 'Project Manager' },
-    { id: 5, name: 'Alex Brown', role: 'Full Stack Developer' },
-    { id: 6, name: 'Emily Davis', role: 'DevOps Engineer' }
-];
+const BASE_URL = 'http://localhost:5000/api';
+
+// Employee Search Component
+const EmployeeSearch = ({ onSelectEmployee, selectedEmployees }) => {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [employees, setEmployees] = useState([]);
+    const [filteredEmployees, setFilteredEmployees] = useState([]);
+    const [showDropdown, setShowDropdown] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const { userData } = useUser();
+    const dropdownRef = useRef(null);
+
+    // Fetch all employees when component mounts
+    useEffect(() => {
+        const fetchEmployees = async () => {
+            try {
+                setLoading(true);
+                const response = await axios.post(`${BASE_URL}/employees/get-employees`, {
+                    organization_id: userData.organization_id,
+                    user_id: userData.user_id
+                });
+
+                if (response.data.success) {
+                    setEmployees(response.data.data);
+                } else {
+                    toast.error("Failed to fetch employees");
+                }
+            } catch (error) {
+                console.error("Error fetching employees:", error);
+                toast.error("Error fetching employees");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchEmployees();
+    }, [userData.organization_id, userData.user_id]);
+
+    // Filter employees based on search term
+    useEffect(() => {
+        if (searchTerm.trim() === '') {
+            setFilteredEmployees([]);
+            setShowDropdown(false);
+            return;
+        }
+
+        const filtered = employees.filter(employee =>
+            (employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                employee.title.toLowerCase().includes(searchTerm.toLowerCase())) &&
+            !selectedEmployees.some(selected => selected.user_id === employee.user_id)
+        );
+
+        setFilteredEmployees(filtered);
+        setShowDropdown(true);
+    }, [searchTerm, employees, selectedEmployees]);
+
+    // Handle click outside to close dropdown
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setShowDropdown(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
+
+    const handleSelectEmployee = (employee) => {
+        onSelectEmployee(employee);
+        setSearchTerm('');
+        setShowDropdown(false);
+    };
+
+    return (
+        <div className="relative" ref={dropdownRef}>
+            <div className="relative">
+                <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search employees..."
+                    className="w-full p-2 border border-gray-300 rounded-md pr-10"
+                />
+                <Search className="absolute right-3 top-2.5 text-gray-400" size={18} />
+            </div>
+
+            {loading && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg p-2 text-center">
+                    Loading employees...
+                </div>
+            )}
+
+            {showDropdown && !loading && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                    {filteredEmployees.length > 0 ? (
+                        filteredEmployees.map(employee => (
+                            <div
+                                key={employee.user_id}
+                                className="p-2 hover:bg-gray-100 cursor-pointer flex items-center"
+                                onClick={() => handleSelectEmployee(employee)}
+                            >
+                                <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white mr-2">
+                                    {employee.name.charAt(0)}
+                                </div>
+                                <div>
+                                    <div className="font-medium">
+                                        {employee.name}
+                                        {employee.role === 'admin' && <span className="ml-1 text-xs text-blue-600">(Admin)</span>}
+                                    </div>
+                                    <div className="text-xs text-gray-500">{employee.title}</div>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="p-2 text-gray-500 text-center">None found</div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// Selected Team Members Component
+const SelectedTeamMembers = ({ teamMembers, onRemoveMember }) => {
+    return (
+        <div className="flex flex-wrap gap-2 mt-2">
+            {teamMembers.map(member => (
+                <div
+                    key={member.user_id}
+                    className="flex items-center bg-blue-100 text-blue-800 px-3 py-1 rounded-full"
+                >
+                    <span>{member.name}</span>
+                    <button
+                        onClick={() => onRemoveMember(member)}
+                        className="ml-2 text-blue-600 hover:text-blue-800"
+                    >
+                        <X size={16} />
+                    </button>
+                </div>
+            ))}
+        </div>
+    );
+};
 
 const Projects = () => {
-    const [projects, setProjects] = useState([
-        {
-            id: 1,
-            name: 'Website Redesign',
-            description: 'Complete overhaul of company website',
-            status: 'In Progress',
-            deadline: '2024-04-30',
-            team: ['John Doe', 'Jane Smith'],
-            progress: 65,
-            priority: 'High'
-        },
-        {
-            id: 2,
-            name: 'Mobile App Development',
-            description: 'New mobile app for customers',
-            status: 'Planning',
-            deadline: '2024-05-15',
-            team: ['Mike Johnson', 'Sarah Wilson'],
-            progress: 25,
-            priority: 'Medium'
-        },
-        {
-            id: 3,
-            name: 'CRM Integration',
-            description: 'Integrate new CRM system',
-            status: 'Completed',
-            deadline: '2024-03-30',
-            team: ['Alex Brown', 'Emily Davis'],
-            progress: 100,
-            priority: 'High'
-        }
-    ]);
+    const [projects, setProjects] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedProject, setSelectedProject] = useState(null);
     const [deleteProject, setDeleteProject] = useState(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [openMenuId, setOpenMenuId] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [selectedTeamMembers, setSelectedTeamMembers] = useState([]);
+    const { userData, BASE_URL } = useUser();
 
-    const handleCreateProject = (newProject) => {
-        setProjects(prev => [...prev, newProject]);
+    // Fetch projects from the backend
+    useEffect(() => {
+        const fetchProjects = async () => {
+            try {
+                setLoading(true);
+                const response = await axios.post(`${BASE_URL}/projects/get-projects`, {
+                    organization_id: userData.organization_id,
+                    user_id: userData.user_id
+                });
+
+                if (response.data.success) {
+                    setProjects(response.data.data);
+                } else {
+                    setError("Failed to fetch projects");
+                }
+            } catch (err) {
+                setError(err.message || "An error occurred while fetching projects");
+                console.error("Error fetching projects:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchProjects();
+    }, [userData.organization_id, userData.user_id, BASE_URL]);
+
+    const handleCreateProject = async (newProject) => {
+        try {
+            // Extract user_ids from selected team members
+            const teamUserIds = selectedTeamMembers.map(member => member);
+            console.log('Selected Team Members (Full Data):', selectedTeamMembers);
+            console.log('Selected Team Members (User IDs):', teamUserIds);
+            console.log('Selected Team Members Count:', selectedTeamMembers.length);
+
+            const projectPayload = {
+                ...newProject,
+                team: teamUserIds,
+                organization_id: userData.organization_id,
+                user_id: userData.user_id,
+            };
+            console.log('Complete Project Payload:', projectPayload);
+
+            const response = await axios.post(`${BASE_URL}/projects/create-project`, projectPayload);
+            console.log('Create Project Response:', response.data);
+
+            if (response.data.success) {
+                setProjects(prev => [...prev, response.data.data]);
+                toast.success("Project created successfully");
+                setSelectedTeamMembers([]);
+            } else {
+                setError("Failed to create project");
+                toast.error("Failed to create project");
+            }
+        } catch (err) {
+            console.error("Error creating project:", err);
+            console.error("Error details:", {
+                message: err.message,
+                response: err.response?.data,
+                status: err.response?.status
+            });
+            setError(err.message || "An error occurred while creating the project");
+            toast.error("Error creating project");
+        }
     };
 
-    const handleUpdateProject = (updatedProject) => {
-        setProjects(prev => prev.map(p => 
-            p.id === updatedProject.id ? updatedProject : p
-        ));
+    const handleUpdateProject = async (formData,project_id) => {
+        try {
+            const teamUserObjects = formData.team; // Already full objects!
+            console.log('teamUserObjects:', teamUserObjects);
+
+            const projectPayload = {
+                ...formData,
+                team: teamUserObjects,
+                organization_id: userData.organization_id,
+                user_id: userData.user_id,
+            };
+            console.log('Complete Project Payload (Update):', projectPayload);
+
+            const response = await axios.post(`${BASE_URL}/projects/update-project`, projectPayload);
+
+            if (response.data.success) {
+                setProjects(prev => prev.map(p =>
+                    p.project_id === response.data.data.project_id ? response.data.data : p
+                ));
+                toast.success("Project updated successfully");
+            } else {
+                setError("Failed to update project");
+                toast.error("Failed to update project");
+            }
+        } catch (err) {
+            setError(err.message || "An error occurred while updating the project");
+            console.error("Error updating project:", err);
+            toast.error("Error updating project");
+        }
     };
 
-    const handleDeleteProject = (projectId) => {
-        setProjects(prev => prev.filter(p => p.id !== projectId));
+    const handleDeleteProject = async (projectId) => {
+        try {
+            const response = await axios.post(`${BASE_URL}/projects/delete-project`, {
+                project_id: projectId,
+                organization_id: userData.organization_id,
+                user_id: userData.user_id
+            });
+
+            if (response.data.success) {
+                setProjects(prev => prev.filter(p => p.project_id !== projectId));
+                toast.success("Project deleted successfully");
+            } else {
+                setError("Failed to delete project");
+                toast.error("Failed to delete project");
+            }
+        } catch (err) {
+            setError(err.message || "An error occurred while deleting the project");
+            console.error("Error deleting project:", err);
+            toast.error("Error deleting project");
+        }
     };
 
     // Advanced metrics calculations
@@ -94,7 +312,7 @@ const Projects = () => {
     };
 
     const handleConfirmDelete = () => {
-        handleDeleteProject(deleteProject.id);
+        handleDeleteProject(deleteProject.project_id);
         setShowDeleteConfirm(false);
         setDeleteProject(null);
     };
@@ -113,11 +331,51 @@ const Projects = () => {
         };
     }, []);
 
+    // Handle team member selection
+    const handleSelectTeamMember = (employee) => {
+        if (!selectedTeamMembers.some(member => member.user_id === employee.user_id)) {
+            setSelectedTeamMembers(prev => [...prev, employee]);
+        }
+    };
+
+    // Handle team member removal
+    const handleRemoveTeamMember = (employee) => {
+        setSelectedTeamMembers(prev => prev.filter(member => member.user_id !== employee.user_id));
+    };
+
+    // Reset selected team members when modal is closed
+    useEffect(() => {
+        if (!isModalOpen) {
+            setSelectedTeamMembers([]);
+        }
+    }, [isModalOpen]);
+
+    // Set selected team members when editing a project
+    useEffect(() => {
+        if (selectedProject && isModalOpen) {
+            // In a real app, you would fetch the full employee details here
+            // For now, we'll just use the team member IDs from the project
+            const teamMembers = selectedProject.team.map(memberId => ({
+                user_id: memberId,
+                name: `Employee ${memberId}` // This would be the actual name in a real app
+            }));
+            setSelectedTeamMembers(teamMembers);
+        }
+    }, [selectedProject, isModalOpen]);
+
+    if (loading) {
+        return <div className="p-6 text-center">Loading projects...</div>;
+    }
+
+    if (error) {
+        return <div className="p-6 text-center text-red-500">Error: {error}</div>;
+    }
+
     return (
         <div className="p-6">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold">Projects</h1>
-                <button 
+                <button
                     onClick={() => {
                         setSelectedProject(null);
                         setIsModalOpen(true);
@@ -131,21 +389,21 @@ const Projects = () => {
 
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {projects.map((project) => (
-                    <Card key={project.id} className="p-6">
+                {projects.map((project,index) => (
+                    <Card key={project.project_id} className="p-6">
                         <div className="flex justify-between items-start mb-4">
                             <div>
                                 <h3 className="text-lg font-semibold">{project.name}</h3>
                                 <p className="text-sm text-gray-500">{project.description}</p>
                             </div>
                             <div className="relative project-menu">
-                                <button 
-                                    onClick={() => setOpenMenuId(openMenuId === project.id ? null : project.id)}
+                                <button
+                                    onClick={() => setOpenMenuId(openMenuId === project.project_id ? null : project.project_id)}
                                     className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
                                 >
                                     <MoreVertical size={20} />
                                 </button>
-                                {openMenuId === project.id && (
+                                {openMenuId === project.project_id && (
                                     <motion.div
                                         initial={{ opacity: 0, y: -10 }}
                                         animate={{ opacity: 1, y: 0 }}
@@ -187,17 +445,15 @@ const Projects = () => {
 
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
-                                <span className={`px-2 py-1 text-xs rounded-full ${
-                                    project.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                                    project.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                                    'bg-yellow-100 text-yellow-800'
-                                }`}>
+                                <span className={`px-2 py-1 text-xs rounded-full ${project.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                                        project.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
+                                            'bg-yellow-100 text-yellow-800'
+                                    }`}>
                                     {project.status}
                                 </span>
-                                <span className={`px-2 py-1 text-xs rounded-full ${
-                                    project.priority === 'High' ? 'bg-red-100 text-red-800' :
-                                    'bg-orange-100 text-orange-800'
-                                }`}>
+                                <span className={`px-2 py-1 text-xs rounded-full ${project.priority === 'High' ? 'bg-red-100 text-red-800' :
+                                        'bg-orange-100 text-orange-800'
+                                    }`}>
                                     {project.priority}
                                 </span>
                             </div>
@@ -218,8 +474,8 @@ const Projects = () => {
                                     <span>{project.progress}%</span>
                                 </div>
                                 <div className="w-full bg-gray-200 rounded-full h-2">
-                                    <div 
-                                        className="bg-green-500 h-2 rounded-full" 
+                                    <div
+                                        className="bg-green-500 h-2 rounded-full"
                                         style={{ width: `${project.progress}%` }}
                                     ></div>
                                 </div>
@@ -304,23 +560,33 @@ const Projects = () => {
                 </Card>
             </div>
 
-           
 
-            <ProjectModal
-                isOpen={isModalOpen}
-                onClose={() => {
-                    setIsModalOpen(false);
-                    setSelectedProject(null);
-                }}
-                onSubmit={(project) => {
-                    if (selectedProject) {
-                        handleUpdateProject(project);
-                    } else {
-                        handleCreateProject(project);
-                    }
-                }}
-                project={selectedProject}
-            />
+
+            {isModalOpen && !selectedProject && (
+                <AddProjectModal
+                    isOpen={isModalOpen}
+                    onClose={() => {
+                        setIsModalOpen(false);
+                        setSelectedProject(null);
+                        setSelectedTeamMembers([]);
+                    }}
+                    onSubmit={handleCreateProject}
+                    selectedTeamMembers={selectedTeamMembers}
+                    setSelectedTeamMembers={setSelectedTeamMembers}
+                />
+            )}
+
+            {isModalOpen && selectedProject && (
+                <EditProjectModal
+                    isOpen={isModalOpen}
+                    onClose={() => {
+                        setIsModalOpen(false);
+                        setSelectedProject(null);
+                    }}
+                    onSubmit={handleUpdateProject}
+                    project={selectedProject}
+                />
+            )}
 
             <DeleteProjectModal
                 isOpen={!!deleteProject && !showDeleteConfirm}
@@ -342,36 +608,102 @@ const Projects = () => {
     );
 };
 
-const ProjectModal = ({ isOpen, onClose, onSubmit, project = null }) => {
+// Add Project Modal Component
+const AddProjectModal = ({ isOpen, onClose, onSubmit, selectedTeamMembers, setSelectedTeamMembers }) => {
     const initialFormState = {
         name: '',
         description: '',
-        status: 'Planning',
+        status: 'Not Started',
         deadline: new Date().toISOString().split('T')[0],
-        team: [],
+        team: selectedTeamMembers,
         priority: 'Medium',
         tasks: [],
-        progress: 0
+        progress: 0,
+        project_id:""
     };
 
     const [formData, setFormData] = useState(initialFormState);
-    const [newTask, setNewTask] = useState({ title: '', description: '', subtasks: [] });
+    const [newTask, setNewTask] = useState({ title: '', description: '', status: 'Pending', priority: 'Medium', dueDate: '', subtasks: [] });
     const [newSubtask, setNewSubtask] = useState('');
     const [errors, setErrors] = useState({});
+    const [employees, setEmployees] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filteredEmployees, setFilteredEmployees] = useState([]);
+    const [showDropdown, setShowDropdown] = useState(false);
+    const dropdownRef = useRef(null);
+    const { userData, BASE_URL } = useUser();
 
-    const statuses = ['Planning', 'In Progress', 'On Hold', 'Completed'];
-    const priorities = ['Low', 'Medium', 'High', 'Critical'];
+    const statuses = ['Not Started', 'In Progress', 'On Hold', 'Completed', 'Cancelled'];
+    const priorities = ['Low', 'Medium', 'High', 'Urgent'];
 
+    // Update formData.team when selectedTeamMembers changes
     useEffect(() => {
-        if (project && isOpen) {
-            setFormData(project);
-        } else if (!isOpen) {
-            setFormData(initialFormState);
-            setNewTask({ title: '', description: '', subtasks: [] });
-            setNewSubtask('');
-            setErrors({});
+        setFormData(prev => ({
+            ...prev,
+            team: selectedTeamMembers
+        }));
+    }, [selectedTeamMembers]);
+
+    // Fetch employees when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            fetchEmployees();
         }
-    }, [project, isOpen]);
+    }, [isOpen]);
+
+    // Filter employees based on search term
+    useEffect(() => {
+        if (searchTerm.trim().length < 3) {
+            setFilteredEmployees([]);
+            setShowDropdown(false);
+            return;
+        }
+
+        const filtered = employees.filter(employee =>
+            (employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                employee.title.toLowerCase().includes(searchTerm.toLowerCase())) &&
+            !formData.team.some(selected => selected.user_id === employee.user_id)
+        );
+
+        setFilteredEmployees(filtered);
+        setShowDropdown(true);
+    }, [searchTerm, employees, formData.team]);
+
+    // Handle click outside to close dropdown
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setShowDropdown(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
+
+    const fetchEmployees = async () => {
+        try {
+            setLoading(true);
+            const response = await axios.post(`${BASE_URL}/employees/get-employees`, {
+                organization_id: userData.organization_id,
+                user_id: userData.user_id
+            });
+
+            if (response.data.success) {
+                setEmployees(response.data.data);
+            } else {
+                toast.error("Failed to fetch employees");
+            }
+        } catch (error) {
+            console.error("Error fetching employees:", error);
+            toast.error("Error fetching employees");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -382,13 +714,18 @@ const ProjectModal = ({ isOpen, onClose, onSubmit, project = null }) => {
         if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
     };
 
-    const handleEmployeeToggle = (employee) => {
-        setFormData(prev => ({
-            ...prev,
-            team: prev.team.includes(employee)
-                ? prev.team.filter(e => e !== employee)
-                : [...prev.team, employee]
-        }));
+    const handleSelectEmployee = (employee) => {
+        setSelectedTeamMembers(prev => [...prev, employee]);
+        setSearchTerm('');
+        setShowDropdown(false);
+    };
+
+    useEffect(() => {
+        console.log('Selected Team Members (updated):', selectedTeamMembers);
+    }, [selectedTeamMembers]);
+
+    const handleRemoveEmployee = (employee) => {
+        setSelectedTeamMembers(prev => prev.filter(member => member.user_id !== employee.user_id));
     };
 
     const addTask = () => {
@@ -397,7 +734,7 @@ const ProjectModal = ({ isOpen, onClose, onSubmit, project = null }) => {
                 ...prev,
                 tasks: [...prev.tasks, { ...newTask, id: Date.now() }]
             }));
-            setNewTask({ title: '', description: '', subtasks: [] });
+            setNewTask({ title: '', description: '', status: 'Pending', priority: 'Medium', dueDate: '', subtasks: [] });
         }
     };
 
@@ -405,7 +742,7 @@ const ProjectModal = ({ isOpen, onClose, onSubmit, project = null }) => {
         if (newSubtask.trim()) {
             setNewTask(prev => ({
                 ...prev,
-                subtasks: [...prev.subtasks, { title: newSubtask.trim() }]
+                subtasks: [...prev.subtasks, { title: newSubtask.trim(), status: 'Pending', dueDate: '', id: Date.now() }]
             }));
             setNewSubtask('');
         }
@@ -422,10 +759,8 @@ const ProjectModal = ({ isOpen, onClose, onSubmit, project = null }) => {
             return;
         }
 
-        onSubmit({
-            ...formData,
-            id: project?.id || Date.now()
-        });
+        console.log('Submitting project with team:', formData.team);
+        onSubmit(formData);
         onClose();
     };
 
@@ -433,9 +768,7 @@ const ProjectModal = ({ isOpen, onClose, onSubmit, project = null }) => {
         <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 ${isOpen ? '' : 'hidden'}`}>
             <div className="bg-white rounded-lg w-full max-w-4xl">
                 <div className="flex justify-between items-center p-6 border-b">
-                    <h2 className="text-2xl font-semibold">
-                        {project ? 'Edit Project' : 'Create New Project'}
-                    </h2>
+                    <h2 className="text-2xl font-semibold">Create New Project</h2>
                     <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
                         <X size={24} />
                     </button>
@@ -469,6 +802,536 @@ const ProjectModal = ({ isOpen, onClose, onSubmit, project = null }) => {
                                 onChange={handleChange}
                                 className={`w-full p-2 border rounded-md ${errors.deadline ? 'border-red-500' : 'border-gray-300'}`}
                             />
+                            {errors.deadline && <p className="text-red-500 text-xs mt-1">{errors.deadline}</p>}
+                        </div>
+
+                        <div className="col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Description
+                            </label>
+                            <textarea
+                                name="description"
+                                value={formData.description}
+                                onChange={handleChange}
+                                rows="3"
+                                className="w-full p-2 border border-gray-300 rounded-md"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Status
+                            </label>
+                            <select
+                                name="status"
+                                value={formData.status}
+                                onChange={handleChange}
+                                className="w-full p-2 border border-gray-300 rounded-md"
+                            >
+                                {statuses.map((status, index) => (
+                                    <option key={status} value={status}>{status}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Priority
+                            </label>
+                            <select
+                                name="priority"
+                                value={formData.priority}
+                                onChange={handleChange}
+                                className="w-full p-2 border border-gray-300 rounded-md"
+                            >
+                                {priorities.map(priority => (
+                                    <option key={priority} value={priority}>{priority}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Team Members */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Team Members
+                        </label>
+                        <div className="relative" ref={dropdownRef}>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    placeholder="Search employees (type at least 3 characters)..."
+                                    className="w-full p-2 border border-gray-300 rounded-md pr-10"
+                                />
+                                <Search className="absolute right-3 top-2.5 text-gray-400" size={18} />
+                            </div>
+
+                            {loading && (
+                                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg p-2 text-center">
+                                    Loading employees...
+                                </div>
+                            )}
+
+                            {showDropdown && !loading && (
+                                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                    {filteredEmployees.length > 0 ? (
+                                        filteredEmployees.map((employee, index) => (
+                                            <div
+                                                key={employee.user_id}
+                                                className="p-2 hover:bg-gray-100 cursor-pointer flex items-center"
+                                                onClick={() => handleSelectEmployee(employee)}
+                                            >
+                                                <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white mr-2">
+                                                    {employee.name.charAt(0)}
+                                                </div>
+                                                <div>
+                                                    <div className="font-medium">
+                                                        {employee.name}
+                                                        {employee.role === 'admin' && <span className="ml-1 text-xs text-blue-600">(Admin)</span>}
+                                                    </div>
+                                                    <div className="text-xs text-gray-500">{employee.title}</div>
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="p-2 text-gray-500 text-center">None found</div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Selected Team Members */}
+                        <div className="flex flex-wrap gap-2 mt-4">
+                            {formData.team.map((member, index) => (
+                                <div
+                                    key={member.user_id}
+                                    className="flex items-center bg-blue-100 text-blue-800 px-3 py-1 rounded-full"
+                                >
+                                    <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-white mr-2 text-xs">
+                                        {member.name.charAt(0)}
+                                    </div>
+                                    <span>{member.name}</span>
+                                    <button
+                                        onClick={() => handleRemoveEmployee(member)}
+                                        className="ml-2 text-blue-600 hover:text-blue-800"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Tasks */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Tasks
+                        </label>
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <input
+                                    type="text"
+                                    value={newTask.title}
+                                    onChange={(e) => setNewTask(prev => ({ ...prev, title: e.target.value }))}
+                                    placeholder="Task title"
+                                    className="p-2 border border-gray-300 rounded-md"
+                                />
+                                <input
+                                    type="text"
+                                    value={newTask.description}
+                                    onChange={(e) => setNewTask(prev => ({ ...prev, description: e.target.value }))}
+                                    placeholder="Task description"
+                                    className="p-2 border border-gray-300 rounded-md"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <select
+                                    value={newTask.status}
+                                    onChange={(e) => setNewTask(prev => ({ ...prev, status: e.target.value }))}
+                                    className="p-2 border border-gray-300 rounded-md"
+                                >
+                                    <option value="Pending">Pending</option>
+                                    <option value="In Progress">In Progress</option>
+                                    <option value="Completed">Completed</option>
+                                </select>
+                                <select
+                                    value={newTask.priority}
+                                    onChange={(e) => setNewTask(prev => ({ ...prev, priority: e.target.value }))}
+                                    className="p-2 border border-gray-300 rounded-md"
+                                >
+                                    <option value="Low">Low</option>
+                                    <option value="Medium">Medium</option>
+                                    <option value="High">High</option>
+                                    <option value="Urgent">Urgent</option>
+                                </select>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-4">
+                                <input
+                                    type="date"
+                                    value={newTask.dueDate}
+                                    onChange={(e) => setNewTask(prev => ({ ...prev, dueDate: e.target.value }))}
+                                    className="p-2 border border-gray-300 rounded-md"
+                                />
+                            </div>
+
+                            {/* Subtasks */}
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={newSubtask}
+                                    onChange={(e) => setNewSubtask(e.target.value)}
+                                    placeholder="Add subtask"
+                                    className="flex-1 p-2 border border-gray-300 rounded-md"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={addSubtask}
+                                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md"
+                                >
+                                    Add Subtask
+                                </button>
+                            </div>
+
+                            {newTask.subtasks.length > 0 && (
+                                <div className="pl-4 space-y-2">
+                                    {newTask.subtasks.map((subtask, index) => (
+                                        <div key={subtask.id || index} className="flex items-center gap-2">
+                                            <span>• {subtask.title}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setNewTask(prev => ({
+                                                        ...prev,
+                                                        subtasks: prev.subtasks.filter((_, i) => i !== index)
+                                                    }));
+                                                }}
+                                                className="text-red-500"
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <button
+                                type="button"
+                                onClick={addTask}
+                                className="w-full py-2 bg-blue-500 text-white rounded-md"
+                            >
+                                Add Task
+                            </button>
+
+                            {/* Task List */}
+                            <div className="space-y-2">
+                                {formData.tasks.map((task, index) => (
+                                    <div key={task.id || index} className="p-3 bg-gray-50 rounded-md">
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <h4 className="font-medium">{task.title}</h4>
+                                                <p className="text-sm text-gray-500">{task.description}</p>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className={`px-2 py-1 text-xs rounded-full ${task.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                                                            task.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
+                                                                'bg-yellow-100 text-yellow-800'
+                                                        }`}>
+                                                        {task.status}
+                                                    </span>
+                                                    <span className={`px-2 py-1 text-xs rounded-full ${task.priority === 'High' ? 'bg-red-100 text-red-800' :
+                                                            'bg-orange-100 text-orange-800'
+                                                        }`}>
+                                                        {task.priority}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setFormData(prev => ({
+                                                        ...prev,
+                                                        tasks: prev.tasks.filter((_, i) => i !== index)
+                                                    }));
+                                                }}
+                                                className="text-red-500"
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                        {task.subtasks.length > 0 && (
+                                            <div className="mt-2 pl-4 space-y-1">
+                                                {task.subtasks.map((subtask, idx) => (
+                                                    <div key={subtask.id || idx} className="text-sm text-gray-600">
+                                                        • {subtask.title}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end gap-4 pt-4 border-t">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-4 py-2 border border-gray-300 rounded-md"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            className="px-4 py-2 bg-green-500 text-white rounded-md"
+                        >
+                            Create Project
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+// Edit Project Modal Component
+const EditProjectModal = ({ isOpen, onClose, onSubmit, project }) => {
+    const [formData, setFormData] = useState({
+        name: '',
+        description: '',
+        status: 'Not Started',
+        deadline: new Date().toISOString().split('T')[0],
+        team: [],
+        priority: 'Medium',
+        tasks: [],
+        progress: 0
+    });
+    const [newTask, setNewTask] = useState({ title: '', description: '', status: 'Pending', priority: 'Medium', dueDate: '', subtasks: [] });
+    const [newSubtask, setNewSubtask] = useState('');
+    const [errors, setErrors] = useState({});
+    const [employees, setEmployees] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filteredEmployees, setFilteredEmployees] = useState([]);
+    const [showDropdown, setShowDropdown] = useState(false);
+    const dropdownRef = useRef(null);
+    const { userData, BASE_URL } = useUser();
+
+    const statuses = ['Not Started', 'In Progress', 'On Hold', 'Completed', 'Cancelled'];
+    const priorities = ['Low', 'Medium', 'High', 'Urgent'];
+
+    // Fetch employees when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            fetchEmployees();
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (project && employees.length > 0) {
+            // Map project.team (which may be names or user_ids) to full employee objects
+            const teamMembers = (project.team || []).map(t =>
+                // If t is already an object with user_id, return as is
+                typeof t === 'object' && t.user_id
+                    ? t
+                    // If t is a string, find the employee by user_id or name
+                    : employees.find(emp => emp.user_id === t || emp.name === t)
+            ).filter(Boolean); // Remove any undefined
+    
+            setFormData({
+                name: project.name || '',
+                description: project.description || '',
+                status: project.status || 'Not Started',
+                deadline: project.deadline || new Date().toISOString().split('T')[0],
+                team: teamMembers,
+                priority: project.priority || 'Medium',
+                tasks: project.tasks || [],
+                progress: project.progress || 0
+            });
+        }
+    }, [project, employees, isOpen]);
+
+    // Update form data when project changes
+    useEffect(() => {
+        if (project) {
+            setFormData({
+                name: project.name || '',
+                description: project.description || '',
+                status: project.status || 'Not Started',
+                deadline: project.deadline || new Date().toISOString().split('T')[0],
+                team: project.team || [],
+                priority: project.priority || 'Medium',
+                tasks: project.tasks || [],
+                progress: project.progress || 0
+            });
+        }
+    }, [project, isOpen]);
+
+    // Filter employees based on search term
+    useEffect(() => {
+        if (searchTerm.trim().length < 3) {
+            setFilteredEmployees([]);
+            setShowDropdown(false);
+            return;
+        }
+
+        const filtered = employees.filter(employee =>
+            (employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                employee.title.toLowerCase().includes(searchTerm.toLowerCase())) &&
+            !formData.team.some(selected => selected.user_id === employee.user_id)
+        );
+        console.log('Filtered Employees:', filtered);
+
+        setFilteredEmployees(filtered);
+        console.log('Filtered Employees:', filtered);
+        setShowDropdown(true);
+    }, [searchTerm, employees, formData.team]);
+
+    // Handle click outside to close dropdown
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setShowDropdown(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
+
+    const fetchEmployees = async () => {
+        try {
+            setLoading(true);
+            const response = await axios.post(`${BASE_URL}/employees/get-employees`, {
+                organization_id: userData.organization_id,
+                user_id: userData.user_id
+            });
+
+            if (response.data.success) {
+                setEmployees(response.data.data);
+            } else {
+                toast.error("Failed to fetch employees");
+            }
+        } catch (error) {
+            console.error("Error fetching employees:", error);
+            toast.error("Error fetching employees");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+        if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
+    };
+
+    const handleSelectEmployee = (employee) => {
+        setFormData(prev => ({
+            ...prev,
+            team: [...prev.team, employee]
+        }));
+        setSearchTerm('');
+        setShowDropdown(false);
+    };
+
+    const handleRemoveEmployee = (employee) => {
+        setFormData(prev => ({
+            ...prev,
+            team: prev.team.filter(member => member.user_id !== employee.user_id)
+        }));
+    };
+
+    const addTask = () => {
+        if (newTask.title.trim()) {
+            setFormData(prev => ({
+                ...prev,
+                tasks: [...prev.tasks, { ...newTask, id: Date.now() }]
+            }));
+            setNewTask({ title: '', description: '', status: 'Pending', priority: 'Medium', dueDate: '', subtasks: [] });
+        }
+    };
+
+    const addSubtask = () => {
+        if (newSubtask.trim()) {
+            setNewTask(prev => ({
+                ...prev,
+                subtasks: [...prev.subtasks, { title: newSubtask.trim(), status: 'Pending', dueDate: '', id: Date.now() }]
+            }));
+            setNewSubtask('');
+        }
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        const newErrors = {};
+        if (!formData.name.trim()) newErrors.name = 'Project name is required';
+        if (!formData.deadline) newErrors.deadline = 'Deadline is required';
+
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
+            return;
+        }
+
+        console.log('project1111:', project);
+
+        onSubmit({ ...formData, project_id: project.project_id });
+        console.log('formData:', formData);
+        onClose();
+    };
+
+    useEffect(() => {
+        console.log('Selected Team Members (EditProjectModal):', formData.team);
+        console.log('form data:', formData);
+    }, [formData]);
+
+    return (
+        <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 ${isOpen ? '' : 'hidden'}`}>
+            <div className="bg-white rounded-lg w-full max-w-4xl">
+                <div className="flex justify-between items-center p-6 border-b">
+                    <h2 className="text-2xl font-semibold">Edit Project</h2>
+                    <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+                        <X size={24} />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+                    {/* Project Details */}
+                    <div className="grid grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Project Name *
+                            </label>
+                            <input
+                                type="text"
+                                name="name"
+                                value={formData.name}
+                                onChange={handleChange}
+                                className={`w-full p-2 border rounded-md ${errors.name ? 'border-red-500' : 'border-gray-300'}`}
+                            />
+                            {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Deadline *
+                            </label>
+                            <input
+                                type="date"
+                                name="deadline"
+                                value={formData.deadline}
+                                onChange={handleChange}
+                                className={`w-full p-2 border rounded-md ${errors.deadline ? 'border-red-500' : 'border-gray-300'}`}
+                            />
+                            {errors.deadline && <p className="text-red-500 text-xs mt-1">{errors.deadline}</p>}
                         </div>
 
                         <div className="col-span-2">
@@ -522,22 +1385,69 @@ const ProjectModal = ({ isOpen, onClose, onSubmit, project = null }) => {
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                             Team Members
                         </label>
-                        <div className="grid grid-cols-2 gap-2">
-                            {employeeOptions.map(employee => (
+                        <div className="relative" ref={dropdownRef}>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    placeholder="Search employees (type at least 3 characters)..."
+                                    className="w-full p-2 border border-gray-300 rounded-md pr-10"
+                                />
+                                <Search className="absolute right-3 top-2.5 text-gray-400" size={18} />
+                            </div>
+
+                            {loading && (
+                                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg p-2 text-center">
+                                    Loading employees...
+                                </div>
+                            )}
+
+                            {showDropdown && !loading && (
+                                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                    {filteredEmployees.length > 0 ? (
+                                        filteredEmployees.map(employee => (
+                                            <div
+                                                key={employee.user_id}
+                                                className="p-2 hover:bg-gray-100 cursor-pointer flex items-center"
+                                                onClick={() => handleSelectEmployee(employee)}
+                                            >
+                                                <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white mr-2">
+                                                    {employee.name.charAt(0)}
+                                                </div>
+                                                <div>
+                                                    <div className="font-medium">
+                                                        {employee.name}
+                                                        {employee.role === 'admin' && <span className="ml-1 text-xs text-blue-600">(Admin)</span>}
+                                                    </div>
+                                                    <div className="text-xs text-gray-500">{employee.title}</div>
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="p-2 text-gray-500 text-center">None found</div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Selected Team Members */}
+                        <div className="flex flex-wrap gap-2 mt-4">
+                            {formData.team.map(member => (
                                 <div
-                                    key={employee.id}
-                                    className="flex items-center space-x-2 p-2 border rounded-md hover:bg-gray-50"
+                                    key={member.user_id}
+                                    className="flex items-center bg-blue-100 text-blue-800 px-3 py-1 rounded-full"
                                 >
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.team.includes(employee.name)}
-                                        onChange={() => handleEmployeeToggle(employee.name)}
-                                        className="h-4 w-4 text-blue-600 rounded"
-                                    />
-                                    <label className="flex-1">
-                                        <div className="text-sm font-medium">{employee.name}</div>
-                                        <div className="text-xs text-gray-500">{employee.role}</div>
-                                    </label>
+                                    <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-white mr-2 text-xs">
+                                        {member.name ? member.name.charAt(0) : '?'}
+                                    </div>
+                                    <span>{member.name || 'Unknown'}</span>
+                                    <button
+                                        onClick={() => handleRemoveEmployee(member)}
+                                        className="ml-2 text-blue-600 hover:text-blue-800"
+                                    >
+                                        <X size={16} />
+                                    </button>
                                 </div>
                             ))}
                         </div>
@@ -566,6 +1476,37 @@ const ProjectModal = ({ isOpen, onClose, onSubmit, project = null }) => {
                                 />
                             </div>
 
+                            <div className="grid grid-cols-2 gap-4">
+                                <select
+                                    value={newTask.status}
+                                    onChange={(e) => setNewTask(prev => ({ ...prev, status: e.target.value }))}
+                                    className="p-2 border border-gray-300 rounded-md"
+                                >
+                                    <option value="Pending">Pending</option>
+                                    <option value="In Progress">In Progress</option>
+                                    <option value="Completed">Completed</option>
+                                </select>
+                                <select
+                                    value={newTask.priority}
+                                    onChange={(e) => setNewTask(prev => ({ ...prev, priority: e.target.value }))}
+                                    className="p-2 border border-gray-300 rounded-md"
+                                >
+                                    <option value="Low">Low</option>
+                                    <option value="Medium">Medium</option>
+                                    <option value="High">High</option>
+                                    <option value="Urgent">Urgent</option>
+                                </select>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-4">
+                                <input
+                                    type="date"
+                                    value={newTask.dueDate}
+                                    onChange={(e) => setNewTask(prev => ({ ...prev, dueDate: e.target.value }))}
+                                    className="p-2 border border-gray-300 rounded-md"
+                                />
+                            </div>
+
                             {/* Subtasks */}
                             <div className="flex gap-2">
                                 <input
@@ -587,7 +1528,7 @@ const ProjectModal = ({ isOpen, onClose, onSubmit, project = null }) => {
                             {newTask.subtasks.length > 0 && (
                                 <div className="pl-4 space-y-2">
                                     {newTask.subtasks.map((subtask, index) => (
-                                        <div key={index} className="flex items-center gap-2">
+                                        <div key={subtask.id || index} className="flex items-center gap-2">
                                             <span>• {subtask.title}</span>
                                             <button
                                                 type="button"
@@ -617,11 +1558,24 @@ const ProjectModal = ({ isOpen, onClose, onSubmit, project = null }) => {
                             {/* Task List */}
                             <div className="space-y-2">
                                 {formData.tasks.map((task, index) => (
-                                    <div key={task.id} className="p-3 bg-gray-50 rounded-md">
+                                    <div key={task.id || index} className="p-3 bg-gray-50 rounded-md">
                                         <div className="flex justify-between items-start">
                                             <div>
                                                 <h4 className="font-medium">{task.title}</h4>
                                                 <p className="text-sm text-gray-500">{task.description}</p>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className={`px-2 py-1 text-xs rounded-full ${task.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                                                            task.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
+                                                                'bg-yellow-100 text-yellow-800'
+                                                        }`}>
+                                                        {task.status}
+                                                    </span>
+                                                    <span className={`px-2 py-1 text-xs rounded-full ${task.priority === 'High' ? 'bg-red-100 text-red-800' :
+                                                            'bg-orange-100 text-orange-800'
+                                                        }`}>
+                                                        {task.priority}
+                                                    </span>
+                                                </div>
                                             </div>
                                             <button
                                                 type="button"
@@ -639,7 +1593,7 @@ const ProjectModal = ({ isOpen, onClose, onSubmit, project = null }) => {
                                         {task.subtasks.length > 0 && (
                                             <div className="mt-2 pl-4 space-y-1">
                                                 {task.subtasks.map((subtask, idx) => (
-                                                    <div key={idx} className="text-sm text-gray-600">
+                                                    <div key={subtask.id || idx} className="text-sm text-gray-600">
                                                         • {subtask.title}
                                                     </div>
                                                 ))}
@@ -663,7 +1617,7 @@ const ProjectModal = ({ isOpen, onClose, onSubmit, project = null }) => {
                             type="submit"
                             className="px-4 py-2 bg-green-500 text-white rounded-md"
                         >
-                            {project ? 'Save Changes' : 'Create Project'}
+                            Save Changes
                         </button>
                     </div>
                 </form>
@@ -693,7 +1647,7 @@ const DeleteProjectModal = ({ isOpen, onClose, project, onProceed }) => {
                     <div className="bg-gray-50 p-4 rounded-lg">
                         <h3 className="font-semibold text-lg mb-2">{project?.name}</h3>
                         <p className="text-gray-600 mb-3">{project?.description}</p>
-                        
+
                         <div className="space-y-2">
                             <div className="flex items-center text-sm text-gray-600">
                                 <Calendar size={16} className="mr-2" />
@@ -704,17 +1658,15 @@ const DeleteProjectModal = ({ isOpen, onClose, project, onProceed }) => {
                                 Team: {project?.team.join(', ')}
                             </div>
                             <div className="flex items-center gap-2">
-                                <span className={`px-2 py-1 text-xs rounded-full ${
-                                    project?.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                                    project?.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                                    'bg-yellow-100 text-yellow-800'
-                                }`}>
+                                <span className={`px-2 py-1 text-xs rounded-full ${project?.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                                        project?.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
+                                            'bg-yellow-100 text-yellow-800'
+                                    }`}>
                                     {project?.status}
                                 </span>
-                                <span className={`px-2 py-1 text-xs rounded-full ${
-                                    project?.priority === 'High' ? 'bg-red-100 text-red-800' :
-                                    'bg-orange-100 text-orange-800'
-                                }`}>
+                                <span className={`px-2 py-1 text-xs rounded-full ${project?.priority === 'High' ? 'bg-red-100 text-red-800' :
+                                        'bg-orange-100 text-orange-800'
+                                    }`}>
                                     {project?.priority}
                                 </span>
                             </div>
@@ -744,7 +1696,7 @@ const DeleteProjectModal = ({ isOpen, onClose, project, onProceed }) => {
 // Delete Confirmation Dialog
 const DeleteConfirmationDialog = ({ isOpen, onClose, project, onConfirm }) => {
     const [confirmText, setConfirmText] = useState('');
-    
+
     return (
         <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 ${isOpen ? '' : 'hidden'}`}>
             <motion.div
@@ -756,7 +1708,7 @@ const DeleteConfirmationDialog = ({ isOpen, onClose, project, onConfirm }) => {
                 <div className="flex justify-center text-red-500 mb-4">
                     <AlertTriangle size={48} />
                 </div>
-                
+
                 <h3 className="text-xl font-bold text-center mb-2">Confirm Project Deletion</h3>
                 <p className="text-gray-600 text-center mb-6">
                     This action cannot be undone. Please type <span className="font-semibold">{project?.name}</span> to confirm deletion.

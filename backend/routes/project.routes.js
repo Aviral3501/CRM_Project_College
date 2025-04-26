@@ -115,9 +115,11 @@ const convertCustomIdsToObjectIds = async (data) => {
 router.post('/get-projects', validateIds, async (req, res) => {
     try {
         const projects = await Project.find({ organization: req.organization._id })
-            .populate('team', 'name')
-            .populate('createdBy', 'name')
-            .populate('updatedBy', 'name');
+            .populate('team', 'name user_id')
+            .populate('createdBy', 'name user_id')
+            .populate('updatedBy', 'name user_id')
+            .populate('tasks.assignedTo', 'name user_id')
+            .populate('tasks.subtasks.assignedTo', 'name user_id');
 
         res.json({
             success: true,
@@ -130,7 +132,23 @@ router.post('/get-projects', validateIds, async (req, res) => {
                 team: project.team.map(member => member.name),
                 progress: project.progress,
                 priority: project.priority,
-                tasks: project.tasks || []
+                tasks: project.tasks.map(task => ({
+                    title: task.title,
+                    description: task.description,
+                    status: task.status,
+                    priority: task.priority,
+                    assignedTo: task.assignedTo?.map(user => user.user_id) || [],
+                    dueDate: task.dueDate?.toISOString().split('T')[0] || null,
+                    subtasks: task.subtasks?.map(subtask => ({
+                        title: subtask.title,
+                        description: subtask.description,
+                        status: subtask.status,
+                        assignedTo: subtask.assignedTo?.user_id || null,
+                        dueDate: subtask.dueDate?.toISOString().split('T')[0] || null,
+                        _id: subtask._id
+                    })) || [],
+                    _id: task._id
+                }))
             }))
         });
     } catch (error) {
@@ -149,7 +167,9 @@ router.post('/create-project', validateIds, async (req, res) => {
         // Find team members by user_id
         let teamRefs = [];
         if (team && team.length > 0) {
-            teamRefs = await Promise.all(team.map(async (userId) => {
+            teamRefs = await Promise.all(team.map(async (member) => {
+                // Handle both string user_id and object with user_id property
+                const userId = typeof member === 'string' ? member : member.user_id;
                 const user = await User.findOne({ user_id: userId });
                 if (!user) {
                     throw new Error(`User with ID ${userId} not found`);
@@ -166,9 +186,11 @@ router.post('/create-project', validateIds, async (req, res) => {
                 let assignedToRefs = [];
                 if (task.assignedTo && task.assignedTo.length > 0) {
                     assignedToRefs = await Promise.all(task.assignedTo.map(async (userId) => {
-                        const user = await User.findOne({ user_id: userId });
+                        // Handle both string user_id and object with user_id property
+                        const userIdentifier = typeof userId === 'string' ? userId : userId.user_id;
+                        const user = await User.findOne({ user_id: userIdentifier });
                         if (!user) {
-                            throw new Error(`User with ID ${userId} not found`);
+                            throw new Error(`User with ID ${userIdentifier} not found`);
                         }
                         return user._id;
                     }));
@@ -180,23 +202,32 @@ router.post('/create-project', validateIds, async (req, res) => {
                     processedSubtasks = await Promise.all(task.subtasks.map(async (subtask) => {
                         let subtaskAssignedTo = null;
                         if (subtask.assignedTo) {
-                            const user = await User.findOne({ user_id: subtask.assignedTo });
+                            // Handle both string user_id and object with user_id property
+                            const userIdentifier = typeof subtask.assignedTo === 'string' ? subtask.assignedTo : subtask.assignedTo.user_id;
+                            const user = await User.findOne({ user_id: userIdentifier });
                             if (!user) {
-                                throw new Error(`User with ID ${subtask.assignedTo} not found`);
+                                throw new Error(`User with ID ${userIdentifier} not found`);
                             }
                             subtaskAssignedTo = user._id;
                         }
 
                         return {
-                            ...subtask,
-                            assignedTo: subtaskAssignedTo
+                            title: subtask.title,
+                            description: subtask.description,
+                            status: subtask.status,
+                            assignedTo: subtaskAssignedTo,
+                            dueDate: subtask.dueDate
                         };
                     }));
                 }
 
                 return {
-                    ...task,
+                    title: task.title,
+                    description: task.description,
+                    status: task.status,
+                    priority: task.priority,
                     assignedTo: assignedToRefs,
+                    dueDate: task.dueDate,
                     subtasks: processedSubtasks
                 };
             }));
@@ -213,18 +244,42 @@ router.post('/create-project', validateIds, async (req, res) => {
 
         await project.save();
 
+        // Populate the project with user information
+        const populatedProject = await Project.findById(project._id)
+            .populate('team', 'name user_id')
+            .populate('createdBy', 'name user_id')
+            .populate('updatedBy', 'name user_id')
+            .populate('tasks.assignedTo', 'name user_id')
+            .populate('tasks.subtasks.assignedTo', 'name user_id');
+
         res.json({
             success: true,
             data: {
-                project_id: project.project_id,
-                name: project.name,
-                description: project.description,
-                status: project.status,
-                deadline: project.deadline?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
-                team: teamRefs.map(member => member.name),
-                progress: project.progress,
-                priority: project.priority,
-                tasks: project.tasks || []
+                project_id: populatedProject.project_id,
+                name: populatedProject.name,
+                description: populatedProject.description,
+                status: populatedProject.status,
+                deadline: populatedProject.deadline?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+                team: populatedProject.team.map(member => member.name),
+                progress: populatedProject.progress,
+                priority: populatedProject.priority,
+                tasks: populatedProject.tasks.map(task => ({
+                    title: task.title,
+                    description: task.description,
+                    status: task.status,
+                    priority: task.priority,
+                    assignedTo: task.assignedTo?.map(user => user.user_id) || [],
+                    dueDate: task.dueDate?.toISOString().split('T')[0] || null,
+                    subtasks: task.subtasks?.map(subtask => ({
+                        title: subtask.title,
+                        description: subtask.description,
+                        status: subtask.status,
+                        assignedTo: subtask.assignedTo?.user_id || null,
+                        dueDate: subtask.dueDate?.toISOString().split('T')[0] || null,
+                        _id: subtask._id
+                    })) || [],
+                    _id: task._id
+                }))
             }
         });
     } catch (error) {
@@ -250,7 +305,9 @@ router.post('/update-project', validateIds, async (req, res) => {
         // Find team members by user_id if team is provided
         let teamRefs = null;
         if (team && team.length > 0) {
-            teamRefs = await Promise.all(team.map(async (userId) => {
+            teamRefs = await Promise.all(team.map(async (member) => {
+                // Handle both string user_id and object with user_id property
+                const userId = typeof member === 'string' ? member : member.user_id;
                 const user = await User.findOne({ user_id: userId });
                 if (!user) {
                     throw new Error(`User with ID ${userId} not found`);
@@ -267,9 +324,11 @@ router.post('/update-project', validateIds, async (req, res) => {
                 let assignedToRefs = [];
                 if (task.assignedTo && task.assignedTo.length > 0) {
                     assignedToRefs = await Promise.all(task.assignedTo.map(async (userId) => {
-                        const user = await User.findOne({ user_id: userId });
+                        // Handle both string user_id and object with user_id property
+                        const userIdentifier = typeof userId === 'string' ? userId : userId.user_id;
+                        const user = await User.findOne({ user_id: userIdentifier });
                         if (!user) {
-                            throw new Error(`User with ID ${userId} not found`);
+                            throw new Error(`User with ID ${userIdentifier} not found`);
                         }
                         return user._id;
                     }));
@@ -281,9 +340,11 @@ router.post('/update-project', validateIds, async (req, res) => {
                     processedSubtasks = await Promise.all(task.subtasks.map(async (subtask) => {
                         let subtaskAssignedTo = null;
                         if (subtask.assignedTo) {
-                            const user = await User.findOne({ user_id: subtask.assignedTo });
+                            // Handle both string user_id and object with user_id property
+                            const userIdentifier = typeof subtask.assignedTo === 'string' ? subtask.assignedTo : subtask.assignedTo.user_id;
+                            const user = await User.findOne({ user_id: userIdentifier });
                             if (!user) {
-                                throw new Error(`User with ID ${subtask.assignedTo} not found`);
+                                throw new Error(`User with ID ${userIdentifier} not found`);
                             }
                             subtaskAssignedTo = user._id;
                         }
@@ -319,9 +380,11 @@ router.post('/update-project', validateIds, async (req, res) => {
                 updatedBy: req.user._id 
             },
             { new: true }
-        ).populate('team', 'name')
-         .populate('tasks.assignedTo', 'name')
-         .populate('tasks.subtasks.assignedTo', 'name');
+        ).populate('team', 'name user_id')
+         .populate('createdBy', 'name user_id')
+         .populate('updatedBy', 'name user_id')
+         .populate('tasks.assignedTo', 'name user_id')
+         .populate('tasks.subtasks.assignedTo', 'name user_id');
 
         if (!project) {
             return res.status(404).json({
@@ -346,15 +409,17 @@ router.post('/update-project', validateIds, async (req, res) => {
                     description: task.description,
                     status: task.status,
                     priority: task.priority,
-                    assignedTo: task.assignedTo.map(user => user.name),
-                    dueDate: task.dueDate,
-                    subtasks: task.subtasks.map(subtask => ({
+                    assignedTo: task.assignedTo?.map(user => user.user_id) || [],
+                    dueDate: task.dueDate?.toISOString().split('T')[0] || null,
+                    subtasks: task.subtasks?.map(subtask => ({
                         title: subtask.title,
                         description: subtask.description,
                         status: subtask.status,
-                        assignedTo: subtask.assignedTo?.name || null,
-                        dueDate: subtask.dueDate
-                    }))
+                        assignedTo: subtask.assignedTo?.user_id || null,
+                        dueDate: subtask.dueDate?.toISOString().split('T')[0] || null,
+                        _id: subtask._id
+                    })) || [],
+                    _id: task._id
                 }))
             }
         });

@@ -80,7 +80,8 @@ router.post('/get-employees', validateIds, async (req, res) => {
                 status: employee.status,
                 performance: employee.performance || 0,
                 projects: employee.projects || [],
-                joinDate: employee.createdAt.toISOString().split('T')[0]
+                joinDate: employee.createdAt.toISOString().split('T')[0],
+                title: employee.title || 'Not specified'
             }))
         });
     } catch (error) {
@@ -102,7 +103,8 @@ router.post('/create-employee', validateIds, async (req, res) => {
             email,
             phone,
             location,
-            password
+            password,
+            title
         } = req.body;
 
         // Check if email already exists
@@ -122,6 +124,7 @@ router.post('/create-employee', validateIds, async (req, res) => {
             phone,
             location,
             password,
+            title,
             organization: req.organization._id,
             createdBy: req.user._id,
             updatedBy: req.user._id,
@@ -147,6 +150,7 @@ router.post('/create-employee', validateIds, async (req, res) => {
                 phone: employee.phone,
                 location: employee.location,
                 status: employee.status,
+                title: employee.title,
                 performance: employee.performance,
                 projects: employee.projects,
                 joinDate: employee.createdAt.toISOString().split('T')[0]
@@ -186,7 +190,7 @@ router.post('/update-employee', validateIds, async (req, res) => {
         }
 
         // Update only the allowed fields
-        const allowedFields = ['name', 'department', 'phone', 'location', 'status', 'performance'];
+        const allowedFields = ['name', 'department', 'phone', 'location', 'status', 'performance', 'title'];
         const updateFields = {};
         
         allowedFields.forEach(field => {
