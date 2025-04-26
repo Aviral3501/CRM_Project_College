@@ -4,6 +4,7 @@ import { Mail, Lock, Loader } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import Input from "../../components/Input";
 import { useAuthStore } from "../../store/authStore";
+import { useUser } from "../../context/UserContext";
 import toast from "react-hot-toast";
 
 const AdminLoginPage = () => {
@@ -11,6 +12,7 @@ const AdminLoginPage = () => {
 	const [password, setPassword] = useState("");
 	const navigate = useNavigate();
 	const { adminLogin, error, isLoading } = useAuthStore();
+	const { setUser } = useUser();
 
 	const handleLogin = async (e) => {
 		e.preventDefault();
@@ -32,6 +34,10 @@ const AdminLoginPage = () => {
 
 		try {
 			const response = await adminLogin(email, password);
+			
+			// Update the global context with user data
+			setUser(response.user);
+			
 			toast.success("Logged in successfully!", {
 				id: loadingToast,
 			});

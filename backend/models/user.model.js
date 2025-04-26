@@ -26,6 +26,9 @@ const userSchema = new mongoose.Schema(
       enum: ["admin", "employee"],
       default: "employee",
     },
+    department: { type: String },
+    phone: { type: String },
+    location: { type: String },
     profileImage: { type: String },
     status: { type: String, enum: ["active", "inactive"], default: "active" }, // To enable/disable user
     permissions: [

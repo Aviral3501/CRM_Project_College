@@ -28,16 +28,18 @@ import Analytics from './pages/analytics/Analytics';
 import Notifications from './pages/notifications/Notifications';
 
 import { useAuthStore } from "./store/authStore";
+import { useUser } from "./context/UserContext";
 
 // protect routes that require authentication
 const ProtectedRoute = ({ children }) => {
-	const { isAuthenticated, user } = useAuthStore();
+	const { isAuthenticated } = useAuthStore();
+	const { isLoggedIn, isVerified } = useUser();
 
-	if (!isAuthenticated) {
+	if (!isAuthenticated || !isLoggedIn()) {
 		return <Navigate to='/login' replace />;
 	}
 
-	if (!user.isVerified) {
+	if (!isVerified()) {
 		return <Navigate to='/verify-email' replace />;
 	}
 
@@ -46,9 +48,10 @@ const ProtectedRoute = ({ children }) => {
 
 // redirect authenticated users
 const RedirectAuthenticatedUser = ({ children }) => {
-	const { isAuthenticated, user } = useAuthStore();
+	const { isAuthenticated } = useAuthStore();
+	const { isLoggedIn, isVerified } = useUser();
 
-	if (isAuthenticated && user.isVerified) {
+	if (isAuthenticated && isLoggedIn() && isVerified()) {
 		return <Navigate to='/dashboard' replace />;
 	}
 

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import axios from "axios";
+import Cookies from "js-cookie";
 
 const API_URL = import.meta.env.MODE === "development" ? "http://localhost:5000/api/auth" : "/api/auth";
 
@@ -24,6 +25,9 @@ export const useAuthStore = create((set) => ({
 				organizationName
 			});
 			if (response.data.success) {
+				// Store user data in cookie
+				Cookies.set('userData', JSON.stringify(response.data.user), { expires: 7 });
+				
 				set({ user: response.data.user, isAuthenticated: true, isLoading: false });
 				return response.data;
 			}
@@ -38,6 +42,10 @@ export const useAuthStore = create((set) => ({
 		set({ isLoading: true, error: null });
 		try {
 			const response = await axios.post(`${API_URL}/admin/signup`, adminData);
+			
+			// Store user data in cookie
+			Cookies.set('userData', JSON.stringify(response.data.admin), { expires: 7 });
+			
 			set({ user: response.data.admin, isAuthenticated: true, isLoading: false });
 			return response.data;
 		} catch (error) {
@@ -51,6 +59,10 @@ export const useAuthStore = create((set) => ({
 		set({ isLoading: true, error: null });
 		try {
 			const response = await axios.post(`${API_URL}/login`, { email, password });
+			
+			// Store user data in cookie
+			Cookies.set('userData', JSON.stringify(response.data.user), { expires: 7 });
+			
 			set({
 				isAuthenticated: true,
 				user: response.data.user,
@@ -69,6 +81,10 @@ export const useAuthStore = create((set) => ({
 		set({ isLoading: true, error: null });
 		try {
 			const response = await axios.post(`${API_URL}/admin/login`, { email, password });
+			
+			// Store user data in cookie
+			Cookies.set('userData', JSON.stringify(response.data.user), { expires: 7 });
+			
 			set({
 				isAuthenticated: true,
 				user: response.data.user,
@@ -86,6 +102,10 @@ export const useAuthStore = create((set) => ({
 		set({ isLoading: true, error: null });
 		try {
 			await axios.post(`${API_URL}/logout`);
+			
+			// Remove user data from cookie
+			Cookies.remove('userData');
+			
 			set({ user: null, isAuthenticated: false, error: null, isLoading: false });
 		} catch (error) {
 			set({ error: "Error logging out", isLoading: false });
@@ -96,10 +116,14 @@ export const useAuthStore = create((set) => ({
 		set({ isLoading: true, error: null });
 		try {
 			const response = await axios.post(`${API_URL}/verify-email`, { code });
+			
+			// Update user data in cookie
+			Cookies.set('userData', JSON.stringify(response.data.user), { expires: 7 });
+			
 			set({ user: response.data.user, isAuthenticated: true, isLoading: false });
 			return response.data;
 		} catch (error) {
-			set({ error: error.response.data.message || "Error verifying email", isLoading: false });
+			set({ error: error.response?.data?.message || "Error verifying email", isLoading: false });
 			throw error;
 		}
 	},

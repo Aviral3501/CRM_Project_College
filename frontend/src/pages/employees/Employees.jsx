@@ -1,28 +1,50 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Card from '../../components/ui/Card';
-import { Plus, Search, Mail, Phone, MapPin, Building, BarChart2, Trash2, X, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Mail, Phone, MapPin, Building, BarChart2, Trash2, X, AlertTriangle, Pencil } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import axios from 'axios';
+import { useUser } from '../../context/UserContext';
+import toast from 'react-hot-toast';
 
 const AddEmployeeModal = ({ isOpen, onClose, onAdd }) => {
     const [newEmployee, setNewEmployee] = useState({
         name: '',
-        role: '',
+        title: '',
         department: '',
         email: '',
+        password: '',
         phone: '',
         location: '',
+        status: 'active'
     });
+
+    // Reset form when modal closes
+    useEffect(() => {
+        if (!isOpen) {
+            setNewEmployee({
+                name: '',
+                title: '',
+                department: '',
+                email: '',
+                password: '',
+                phone: '',
+                location: '',
+                status: 'active'
+            });
+        }
+    }, [isOpen]);
+
+    // Update password when email changes
+    useEffect(() => {
+        setNewEmployee(prev => ({
+            ...prev,
+            password: prev.email
+        }));
+    }, [newEmployee.email]);
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        onAdd({
-            ...newEmployee,
-            id: Date.now(),
-            status: 'Active',
-            performance: 80,
-            projects: [],
-            joinDate: new Date().toISOString().split('T')[0]
-        });
+        onAdd(newEmployee);
         onClose();
     };
 
@@ -55,13 +77,13 @@ const AddEmployeeModal = ({ isOpen, onClose, onAdd }) => {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700">Role</label>
+                                    <label className="block text-sm font-medium text-gray-700">Title</label>
                                     <input
                                         type="text"
                                         required
                                         className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                                        value={newEmployee.role}
-                                        onChange={(e) => setNewEmployee({...newEmployee, role: e.target.value})}
+                                        value={newEmployee.title}
+                                        onChange={(e) => setNewEmployee({...newEmployee, title: e.target.value})}
                                     />
                                 </div>
                                 <div>
@@ -86,6 +108,17 @@ const AddEmployeeModal = ({ isOpen, onClose, onAdd }) => {
                                 />
                             </div>
                             <div>
+                                <label className="block text-sm font-medium text-gray-700">Password</label>
+                                <input
+                                    type="password"
+                                    required
+                                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                                    value={newEmployee.password}
+                                    onChange={(e) => setNewEmployee({...newEmployee, password: e.target.value})}
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Default password is same as email</p>
+                            </div>
+                            <div>
                                 <label className="block text-sm font-medium text-gray-700">Phone</label>
                                 <input
                                     type="tel"
@@ -104,6 +137,17 @@ const AddEmployeeModal = ({ isOpen, onClose, onAdd }) => {
                                     value={newEmployee.location}
                                     onChange={(e) => setNewEmployee({...newEmployee, location: e.target.value})}
                                 />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Status</label>
+                                <select
+                                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                                    value={newEmployee.status}
+                                    onChange={(e) => setNewEmployee({...newEmployee, status: e.target.value})}
+                                >
+                                    <option value="active">Active</option>
+                                    <option value="inactive">Inactive</option>
+                                </select>
                             </div>
                             <div className="flex justify-end gap-2 mt-6">
                                 <button
@@ -128,7 +172,179 @@ const AddEmployeeModal = ({ isOpen, onClose, onAdd }) => {
     );
 };
 
+const EditEmployeeModal = ({ isOpen, onClose, onUpdate, employee }) => {
+    const [editedEmployee, setEditedEmployee] = useState({
+        name: '',
+        title: '',
+        department: '',
+        email: '',
+        phone: '',
+        location: '',
+        status: '',
+     
+    });
+
+    // Reset and prefill form when modal opens or employee changes
+    useEffect(() => {
+        if (isOpen && employee) {
+            setEditedEmployee({
+                name: employee.name || '',
+                title: employee.title || '',
+                department: employee.department || '',
+                email: employee.email || '',
+                phone: employee.phone || '',
+                location: employee.location || '',
+                status: employee.status || 'active',
+             
+            });
+        }
+    }, [isOpen, employee]);
+
+    // Reset form when modal closes
+    useEffect(() => {
+        if (!isOpen) {
+            setEditedEmployee({
+                name: '',
+                title: '',
+                department: '',
+                email: '',
+                phone: '',
+                location: '',
+                status: '',
+              
+            });
+        }
+    }, [isOpen]);
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        onUpdate({
+            ...editedEmployee,
+            user_id: employee.user_id
+        });
+        onClose();
+    };
+
+    return (
+        <AnimatePresence>
+            {isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="bg-white rounded-lg shadow-xl w-full max-w-md p-6"
+                    >
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-bold">Edit Employee</h2>
+                            <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Name</label>
+                                <input
+                                    type="text"
+                                    required
+                                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                                    value={editedEmployee.name}
+                                    onChange={(e) => setEditedEmployee({...editedEmployee, name: e.target.value})}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Email</label>
+                                <input
+                                    type="email"
+                                    required
+                                    disabled
+                                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 bg-gray-50"
+                                    value={editedEmployee.email}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Title</label>
+                                <input
+                                    type="text"
+                                    required
+                                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                                    value={editedEmployee.title}
+                                    onChange={(e) => setEditedEmployee({...editedEmployee, title: e.target.value})}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Department</label>
+                                <input
+                                    type="text"
+                                    required
+                                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                                    value={editedEmployee.department}
+                                    onChange={(e) => setEditedEmployee({...editedEmployee, department: e.target.value})}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Phone</label>
+                                <input
+                                    type="tel"
+                                    required
+                                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                                    value={editedEmployee.phone}
+                                    onChange={(e) => setEditedEmployee({...editedEmployee, phone: e.target.value})}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Location</label>
+                                <input
+                                    type="text"
+                                    required
+                                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                                    value={editedEmployee.location}
+                                    onChange={(e) => setEditedEmployee({...editedEmployee, location: e.target.value})}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Status</label>
+                                <select
+                                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                                    value={editedEmployee.status}
+                                    onChange={(e) => setEditedEmployee({...editedEmployee, status: e.target.value})}
+                                >
+                                    <option value="active">Active</option>
+                                    <option value="inactive">Inactive</option>
+                                </select>
+                            </div>
+                          
+                            <div className="flex justify-end gap-2 mt-6">
+                                <button
+                                    type="button"
+                                    onClick={onClose}
+                                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-4 py-2 text-sm font-medium text-white bg-green-500 rounded-md hover:bg-green-600"
+                                >
+                                    Update Employee
+                                </button>
+                            </div>
+                        </form>
+                    </motion.div>
+                </div>
+            )}
+        </AnimatePresence>
+    );
+};
+
 const RemoveEmployeeModal = ({ isOpen, onClose, employee, onProceed }) => {
+    // Reset state when modal closes
+    useEffect(() => {
+        if (!isOpen) {
+            // Any cleanup needed
+        }
+    }, [isOpen]);
+
     return (
         <AnimatePresence>
             {isOpen && (
@@ -148,7 +364,7 @@ const RemoveEmployeeModal = ({ isOpen, onClose, employee, onProceed }) => {
                         <div className="space-y-4">
                             <div className="p-4 bg-gray-50 rounded-lg">
                                 <h3 className="font-semibold text-lg">{employee?.name}</h3>
-                                <p className="text-gray-600">{employee?.role}</p>
+                                <p className="text-gray-600">{employee?.title}</p>
                                 <div className="mt-2 space-y-2">
                                     <p className="text-sm text-gray-600">Department: {employee?.department}</p>
                                     <p className="text-sm text-gray-600">Email: {employee?.email}</p>
@@ -180,6 +396,23 @@ const RemoveEmployeeModal = ({ isOpen, onClose, employee, onProceed }) => {
 const ConfirmationDialog = ({ isOpen, onClose, onConfirm, employee }) => {
     const [confirmText, setConfirmText] = useState('');
     
+    // Reset confirm text when modal closes
+    useEffect(() => {
+        if (!isOpen) {
+            setConfirmText('');
+        }
+    }, [isOpen]);
+
+    const handleClose = () => {
+        setConfirmText('');
+        onClose();
+    };
+
+    const handleConfirm = () => {
+        setConfirmText('');
+        onConfirm();
+    };
+    
     return (
         <AnimatePresence>
             {isOpen && (
@@ -209,13 +442,13 @@ const ConfirmationDialog = ({ isOpen, onClose, onConfirm, employee }) => {
 
                             <div className="flex justify-center gap-4">
                                 <button
-                                    onClick={onClose}
+                                    onClick={handleClose}
                                     className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
                                 >
                                     Cancel
                                 </button>
                                 <button
-                                    onClick={() => onConfirm()}
+                                    onClick={handleConfirm}
                                     disabled={confirmText !== employee?.name}
                                     className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-md hover:bg-red-600 
                                              disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
@@ -232,55 +465,110 @@ const ConfirmationDialog = ({ isOpen, onClose, onConfirm, employee }) => {
 };
 
 const Employees = () => {
-    const [employees, setEmployees] = useState([
-        {
-            id: 1,
-            name: 'John Doe',
-            role: 'Senior Developer',
-            department: 'Engineering',
-            email: 'john@company.com',
-            phone: '+1 234-567-8900',
-            location: 'San Francisco, CA',
-            status: 'Active',
-            performance: 92,
-            projects: ['Website Redesign', 'Mobile App'],
-            joinDate: '2023-01-15'
-        },
-        {
-            id: 2,
-            name: 'Jane Smith',
-            role: 'Project Manager',
-            department: 'Management',
-            email: 'jane@company.com',
-            phone: '+1 234-567-8901',
-            location: 'New York, NY',
-            status: 'Active',
-            performance: 88,
-            projects: ['CRM Integration'],
-            joinDate: '2023-03-20'
-        },
-        {
-            id: 3,
-            name: 'Mike Johnson',
-            role: 'UI Designer',
-            department: 'Design',
-            email: 'mike@company.com',
-            phone: '+1 234-567-8902',
-            location: 'Austin, TX',
-            status: 'On Leave',
-            performance: 85,
-            projects: ['Mobile App'],
-            joinDate: '2023-06-10'
-        }
-    ]);
-    
+    const [employees, setEmployees] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [selectedEmployee, setSelectedEmployee] = useState(null);
     const [removeEmployee, setRemoveEmployee] = useState(null);
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-    const [confirmText, setConfirmText] = useState('');
+    const { userData, BASE_URL } = useUser();
 
-    const handleAddEmployee = (newEmployee) => {
-        setEmployees([...employees, newEmployee]);
+    // Log when component mounts and when BASE_URL changes
+    useEffect(() => {
+        console.log('Employees component mounted with BASE_URL:', BASE_URL);
+        console.log('Current user data:', userData);
+    }, [BASE_URL, userData]);
+
+    // Fetch employees from API
+    useEffect(() => {
+        const fetchEmployees = async () => {
+            try {
+                setIsLoading(true);
+                console.log('Fetching employees from:', `${BASE_URL}/employees/get-employees`);
+                console.log('Request payload:', {
+                    organization_id: userData.organization_id,
+                    user_id: userData.user_id
+                });
+
+                const response = await axios.post(`${BASE_URL}/employees/get-employees`, {
+                    organization_id: userData.organization_id,
+                    user_id: userData.user_id
+                });
+                
+                console.log('API Response:', response.data);
+                
+                if (response.data.success) {
+                    const employeesData = response.data.data || [];
+                    setEmployees(employeesData);
+                    console.log('Employees fetched successfully:', employeesData.length, 'employees');
+                } else {
+                    console.error('API Error:', response.data.message);
+                    toast.error(response.data.message || "Failed to fetch employees");
+                }
+            } catch (error) {
+                console.error("Error fetching employees:", error);
+                console.error("Error details:", {
+                    message: error.message,
+                    response: error.response?.data,
+                    status: error.response?.status
+                });
+                toast.error("Failed to fetch employees. Please try again later.");
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        if (userData.organization_id && userData.user_id) {
+            fetchEmployees();
+        } else {
+            console.log('Missing required data:', {
+                hasOrgId: !!userData.organization_id,
+                hasUserId: !!userData.user_id
+            });
+        }
+    }, [userData.organization_id, userData.user_id, BASE_URL]);
+
+    const handleAddEmployee = async (newEmployee) => {
+        try {
+            console.log('Creating new employee:', newEmployee);
+            const response = await axios.post(`${BASE_URL}/employees/create-employee`, {
+                organization_id: userData.organization_id,
+                user_id: userData.user_id,
+                name: newEmployee.name,
+                email: newEmployee.email,
+                password: newEmployee.password,
+                title: newEmployee.title,
+                department: newEmployee.department,
+                phone: newEmployee.phone,
+                location: newEmployee.location
+            });
+
+            if (response.data.success) {
+                // Refresh the employees list
+                const updatedResponse = await axios.post(`${BASE_URL}/employees/get-employees`, {
+                    organization_id: userData.organization_id,
+                    user_id: userData.user_id
+                });
+                
+                if (updatedResponse.data.success) {
+                    setEmployees(updatedResponse.data.data || []);
+                }
+                
+                toast.success("Employee added successfully");
+                setIsAddModalOpen(false);
+            } else {
+                toast.error(response.data.message || "Failed to add employee");
+            }
+        } catch (error) {
+            console.error("Error adding employee:", error);
+            toast.error(error.response?.data?.message || "Failed to add employee. Please try again.");
+        }
+    };
+
+    const handleEditClick = (employee) => {
+        setSelectedEmployee(employee);
+        setIsEditModalOpen(true);
     };
 
     const handleRemoveClick = (employee) => {
@@ -291,11 +579,84 @@ const Employees = () => {
         setShowConfirmDialog(true);
     };
 
-    const handleConfirmRemove = () => {
-        setEmployees(employees.filter(emp => emp.id !== removeEmployee.id));
-        setShowConfirmDialog(false);
-        setRemoveEmployee(null);
+    const handleConfirmRemove = async () => {
+        try {
+            console.log('Removing employee:', removeEmployee);
+            const response = await axios.post(`${BASE_URL}/employees/delete-employee`, {
+                organization_id: userData.organization_id,
+                user_id: userData.user_id,
+                target_user_id: removeEmployee.user_id
+            });
+
+            if (response.data.success) {
+                // Refresh the employees list
+                const updatedResponse = await axios.post(`${BASE_URL}/employees/get-employees`, {
+                    organization_id: userData.organization_id,
+                    user_id: userData.user_id
+                });
+                
+                if (updatedResponse.data.success) {
+                    setEmployees(updatedResponse.data.data || []);
+                }
+                
+                toast.success("Employee removed successfully");
+                // Reset all states
+                setShowConfirmDialog(false);
+                setRemoveEmployee(null);
+                setSelectedEmployee(null);
+                setIsEditModalOpen(false);
+            } else {
+                toast.error(response.data.message || "Failed to remove employee");
+            }
+        } catch (error) {
+            console.error("Error removing employee:", error);
+            toast.error(error.response?.data?.message || "Failed to remove employee. Please try again.");
+        }
     };
+
+    const handleUpdateEmployee = async (updatedEmployee) => {
+        try {
+            console.log('Updating employee:', updatedEmployee);
+            const response = await axios.post(`${BASE_URL}/employees/update-employee`, {
+                organization_id: userData.organization_id,
+                user_id: userData.user_id,
+                target_user_id: updatedEmployee.user_id,
+                name: updatedEmployee.name,
+                title: updatedEmployee.title,
+                department: updatedEmployee.department,
+                phone: updatedEmployee.phone,
+                location: updatedEmployee.location,
+                status: updatedEmployee.status,
+            });
+
+            if (response.data.success) {
+                // Refresh the employees list
+                const updatedResponse = await axios.post(`${BASE_URL}/employees/get-employees`, {
+                    organization_id: userData.organization_id,
+                    user_id: userData.user_id
+                });
+                
+                if (updatedResponse.data.success) {
+                    setEmployees(updatedResponse.data.data || []);
+                }
+                
+                toast.success("Employee updated successfully");
+            } else {
+                toast.error(response.data.message || "Failed to update employee");
+            }
+        } catch (error) {
+            console.error("Error updating employee:", error);
+            toast.error(error.response?.data?.message || "Failed to update employee. Please try again.");
+        }
+    };
+
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
+            </div>
+        );
+    }
 
     return (
         <div className="p-6">
@@ -310,75 +671,90 @@ const Employees = () => {
                 </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {employees.map((employee) => (
-                    <Card key={employee.id} className="p-6">
-                        <div className="flex items-start gap-4">
-                            <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
-                                <span className="text-xl font-semibold text-gray-600">
-                                    {employee.name.split(' ').map(n => n[0]).join('')}
-                                </span>
+            {isLoading ? (
+                <div className="flex items-center justify-center h-64">
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
+                </div>
+            ) : employees.length === 0 ? (
+                <div className="text-center py-10">
+                    <p className="text-gray-500">No employees found. Add your first employee to get started.</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {employees.map((employee) => (
+                        <Card key={employee.user_id} className="p-6">
+                            <div className="flex items-start gap-4">
+                                <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
+                                    <span className="text-xl font-semibold text-gray-600">
+                                        {employee.name.split(' ').map(n => n[0]).join('')}
+                                    </span>
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="text-lg font-semibold">{employee.name}</h3>
+                                    <p className="text-sm text-gray-500">{employee.title}</p>
+                                    <span className={`inline-block mt-1 px-2 py-1 text-xs rounded-full ${
+                                        employee.status === 'active' ? 'bg-green-100 text-green-800' : 
+                                        'bg-yellow-100 text-yellow-800'
+                                    }`}>
+                                        {employee.status}
+                                    </span>
+                                </div>
                             </div>
-                            <div className="flex-1">
-                                <h3 className="text-lg font-semibold">{employee.name}</h3>
-                                <p className="text-sm text-gray-500">{employee.role}</p>
-                                <span className={`inline-block mt-1 px-2 py-1 text-xs rounded-full ${
-                                    employee.status === 'Active' ? 'bg-green-100 text-green-800' : 
-                                    'bg-yellow-100 text-yellow-800'
-                                }`}>
-                                    {employee.status}
-                                </span>
-                            </div>
-                        </div>
 
-                        <div className="mt-4 space-y-3">
-                            <div className="flex items-center text-sm text-gray-600">
-                                <Building size={16} className="mr-2" />
-                                {employee.department}
+                            <div className="mt-4 space-y-3">
+                                <div className="flex items-center text-sm text-gray-600">
+                                    <Building size={16} className="mr-2" />
+                                    {employee.department || 'Not specified'}
+                                </div>
+                                <div className="flex items-center text-sm text-gray-600">
+                                    <Mail size={16} className="mr-2" />
+                                    {employee.email}
+                                </div>
+                                <div className="flex items-center text-sm text-gray-600">
+                                    <Phone size={16} className="mr-2" />
+                                    {employee.phone || 'Not specified'}
+                                </div>
+                                <div className="flex items-center text-sm text-gray-600">
+                                    <MapPin size={16} className="mr-2" />
+                                    {employee.location || 'Not specified'}
+                                </div>
                             </div>
-                            <div className="flex items-center text-sm text-gray-600">
-                                <Mail size={16} className="mr-2" />
-                                {employee.email}
-                            </div>
-                            <div className="flex items-center text-sm text-gray-600">
-                                <Phone size={16} className="mr-2" />
-                                {employee.phone}
-                            </div>
-                            <div className="flex items-center text-sm text-gray-600">
-                                <MapPin size={16} className="mr-2" />
-                                {employee.location}
-                            </div>
-                        </div>
 
-                        <div className="mt-4 pt-4 border-t">
-                            <div className="flex justify-between items-center mb-2">
-                                <span className="text-sm text-gray-600">Performance</span>
-                                <span className="text-sm font-medium">{employee.performance}%</span>
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                                <div 
-                                    className="bg-green-500 h-2 rounded-full" 
-                                    style={{ width: `${employee.performance}%` }}
-                                ></div>
-                            </div>
-                        </div>
 
-                        <div className="mt-4 flex justify-end">
-                            <button
-                                onClick={() => handleRemoveClick(employee)}
-                                className="text-red-500 hover:text-red-600 p-2 rounded-full hover:bg-red-50"
-                            >
-                                <Trash2 size={20} />
-                            </button>
-                        </div>
-                    </Card>
-                ))}
-            </div>
+
+                            <div className="mt-4 flex justify-end gap-2">
+                                <button
+                                    onClick={() => handleEditClick(employee)}
+                                    className="text-blue-500 hover:text-blue-600 p-2 rounded-full hover:bg-blue-50"
+                                >
+                                    <Pencil size={20} />
+                                </button>
+                                <button
+                                    onClick={() => handleRemoveClick(employee)}
+                                    className="text-red-500 hover:text-red-600 p-2 rounded-full hover:bg-red-50"
+                                >
+                                    <Trash2 size={20} />
+                                </button>
+                            </div>
+                        </Card>
+                    ))}
+                </div>
+            )}
 
             <AddEmployeeModal
                 isOpen={isAddModalOpen}
                 onClose={() => setIsAddModalOpen(false)}
                 onAdd={handleAddEmployee}
+            />
+
+            <EditEmployeeModal
+                isOpen={isEditModalOpen}
+                onClose={() => {
+                    setIsEditModalOpen(false);
+                    setSelectedEmployee(null);
+                }}
+                onUpdate={handleUpdateEmployee}
+                employee={selectedEmployee}
             />
 
             <RemoveEmployeeModal
@@ -392,9 +768,9 @@ const Employees = () => {
                 isOpen={showConfirmDialog}
                 onClose={() => {
                     setShowConfirmDialog(false);
-                    setConfirmText('');  // Reset confirm text when closing
+                    setRemoveEmployee(null);
                 }}
-                employee={removeEmployee}  // Pass the employee data
+                employee={removeEmployee}
                 onConfirm={handleConfirmRemove}
             />
         </div>

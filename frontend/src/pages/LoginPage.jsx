@@ -1,20 +1,32 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Mail, Lock, Loader, Building } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Input from "../components/Input";
 import { useAuthStore } from "../store/authStore";
+import { useUser } from "../context/UserContext";
 
 const LoginPage = () => {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [organizationName, setOrganizationName] = useState("");
+	const navigate = useNavigate();
 
 	const { login, isLoading, error } = useAuthStore();
+	const { setUser } = useUser();
 
 	const handleLogin = async (e) => {
 		e.preventDefault();
-		await login(email, password, organizationName);
+		try {
+			const response = await login(email, password, organizationName);
+			if (response.success) {
+				// Update the global context with user data
+				setUser(response.user);
+				navigate('/dashboard');
+			}
+		} catch (error) {
+			console.error("Login failed:", error);
+		}
 	};
 
 	return (
