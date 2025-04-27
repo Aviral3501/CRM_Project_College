@@ -116,10 +116,10 @@ const TaskModal = ({ isOpen, onClose, onSubmit }) => {
                 project_id: selectedProject ? selectedProject.project_id : ''
             }));
         } else {
-            setFormData(prev => ({
-                ...prev,
-                [name]: value
-            }));
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
         }
         
         // Clear error when field is edited
@@ -206,15 +206,15 @@ const TaskModal = ({ isOpen, onClose, onSubmit }) => {
                     onSubmit(response.data.data[0]);
                 } else {
                     // Fallback if the API doesn't return the created task
-                    onSubmit({
-                        ...formData,
+        onSubmit({
+            ...formData,
                         task_id: `TSK${Date.now()}`,
                         createdAt: new Date(),
                         project: { title: formData.project }
-                    });
+        });
                 }
                 
-                onClose();
+        onClose();
             } else {
                 toast.error(response.data.message || 'Failed to create task');
             }
@@ -486,10 +486,10 @@ const TaskDetailsModal = ({ isOpen, onClose, task, onUpdate }) => {
                 }
             }));
         } else {
-            setFormData(prev => ({
-                ...prev,
-                [name]: value
-            }));
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
         }
     };
 
@@ -549,11 +549,11 @@ const TaskDetailsModal = ({ isOpen, onClose, task, onUpdate }) => {
 
             if (response.data.success) {
                 toast.success('Task updated successfully!');
-                onUpdate({
-                    ...formData,
+        onUpdate({
+            ...formData,
                     project: formData.project
-                });
-                onClose();
+        });
+        onClose();
             } else {
                 toast.error(response.data.message || 'Failed to update task');
             }
@@ -1745,48 +1745,48 @@ const Tasks = () => {
             <div className="grid grid-cols-1 gap-6 mb-6">
                 {/* Today's and Upcoming Tasks Row */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Today's Tasks */}
-                    <Card className="p-6 col-span-1 bg-white shadow-xl border border-gray-100">
-                        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                            <Calendar className="text-blue-500" size={20} />
-                            Today's Tasks
-                        </h2>
-                        <div className="space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar">
+                {/* Today's Tasks */}
+                <Card className="p-6 col-span-1 bg-white shadow-xl border border-gray-100">
+                    <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <Calendar className="text-blue-500" size={20} />
+                        Today's Tasks
+                    </h2>
+                    <div className="space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar">
                             {isLoading ? (
                                 <div className="flex justify-center items-center h-32">
                                     <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
                                 </div>
                             ) : todaysTasks.length > 0 ? (
                                 todaysTasks.map((task) => (
-                                    <div 
-                                        key={task.task_id} 
+                            <div 
+                                key={task.task_id} 
                                         className={`flex items-start gap-4 p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 ${isOverdue(task.dueDate) ? 'border-l-4 border-red-500' : ''}`}
-                                        onClick={() => openTaskDetails(task)}
-                                    >
-                                        <button className="mt-1">
-                                            {task.status === 'Completed' ? (
-                                                <CheckCircle className="text-green-500" size={20} />
-                                            ) : task.status === 'In Progress' ? (
-                                                <Clock className="text-blue-500" size={20} />
-                                            ) : (
-                                                <Circle className="text-gray-400" size={20} />
-                                            )}
-                                        </button>
-                                        <div className="flex-1">
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <h3 className="font-medium">{task.title}</h3>
-                                                    <p className="text-sm text-gray-500">{task.description}</p>
-                                                </div>
+                                onClick={() => openTaskDetails(task)}
+                            >
+                                <button className="mt-1">
+                                    {task.status === 'Completed' ? (
+                                        <CheckCircle className="text-green-500" size={20} />
+                                    ) : task.status === 'In Progress' ? (
+                                        <Clock className="text-blue-500" size={20} />
+                                    ) : (
+                                        <Circle className="text-gray-400" size={20} />
+                                    )}
+                                </button>
+                                <div className="flex-1">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <h3 className="font-medium">{task.title}</h3>
+                                            <p className="text-sm text-gray-500">{task.description}</p>
+                                        </div>
                                                 <div className="flex flex-col items-end gap-1">
-                                                    <span className={`px-2 py-1 text-xs rounded-full ${
-                                                        task.priority === 'High' ? 'bg-red-100 text-red-800' :
-                                                        task.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                                                        'bg-green-100 text-green-800'
-                                                    }`}>
-                                                        {task.priority}
+                                        <span className={`px-2 py-1 text-xs rounded-full ${
+                                            task.priority === 'High' ? 'bg-red-100 text-red-800' :
+                                            task.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                                            'bg-green-100 text-green-800'
+                                        }`}>
+                                            {task.priority}
                                                         {/* {console.log("task.priority",task.priority)} */}
-                                                    </span>
+                                        </span>
                                                     {isOverdue(task.dueDate) && (
                                                         <span className="flex items-center text-xs text-red-500">
                                                             <AlertTriangle size={12} className="mr-1" />
@@ -1794,146 +1794,146 @@ const Tasks = () => {
                                                         </span>
                                                     )}
                                                 </div>
-                                            </div>
-                                            <div className="mt-2 flex items-center gap-4 text-sm text-gray-600">
+                                    </div>
+                                    <div className="mt-2 flex items-center gap-4 text-sm text-gray-600">
                                                 <span>Project: { task.project.title }</span>
                                                 <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
-                                                {task.subtasks?.length > 0 && (
-                                                    <span>Subtasks: {task.subtasks.length}</span>
-                                                )}
+                                        {task.subtasks?.length > 0 && (
+                                            <span>Subtasks: {task.subtasks.length}</span>
+                                        )}
 
                                                 {/* {console.log("project title",task.project.title)}
                                                 {console.log("due data",task.dueDate)}
                                                 {console.log("subtasks length",task.subtasks.length)} */}
-                                            </div>
-                                        </div>
                                     </div>
+                                </div>
+                            </div>
                                 ))
                             ) : (
-                                <p className="text-gray-500 text-center py-4">No tasks for today</p>
-                            )}
-                        </div>
-                    </Card>
+                            <p className="text-gray-500 text-center py-4">No tasks for today</p>
+                        )}
+                    </div>
+                </Card>
 
-                    {/* Upcoming Tasks */}
-                    <Card className="p-6 col-span-1 bg-white shadow-xl border border-gray-100">
-                        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                            <Clock className="text-yellow-500" size={20} />
-                            Upcoming Tasks
-                        </h2>
-                        <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar">
+                {/* Upcoming Tasks */}
+                <Card className="p-6 col-span-1 bg-white shadow-xl border border-gray-100">
+                    <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <Clock className="text-yellow-500" size={20} />
+                        Upcoming Tasks
+                    </h2>
+                    <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar">
                             {isLoading ? (
                                 <div className="flex justify-center items-center h-32">
                                     <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
                                 </div>
                             ) : upcomingTasks.length > 0 ? (
                                 upcomingTasks.map((task) => (
-                                    <div 
-                                        key={task.task_id} 
-                                        className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100"
-                                        onClick={() => openTaskDetails(task)}
-                                    >
-                                        <div className="mt-1">
-                                            {task.status === 'Completed' ? (
-                                                <CheckCircle className="text-green-500" size={20} />
-                                            ) : task.status === 'In Progress' ? (
-                                                <Clock className="text-blue-500" size={20} />
-                                            ) : (
-                                                <Circle className="text-gray-400" size={20} />
-                                            )}
+                            <div 
+                                key={task.task_id} 
+                                className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100"
+                                onClick={() => openTaskDetails(task)}
+                            >
+                                <div className="mt-1">
+                                    {task.status === 'Completed' ? (
+                                        <CheckCircle className="text-green-500" size={20} />
+                                    ) : task.status === 'In Progress' ? (
+                                        <Clock className="text-blue-500" size={20} />
+                                    ) : (
+                                        <Circle className="text-gray-400" size={20} />
+                                    )}
+                                </div>
+                                <div className="flex-1">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <h3 className="font-medium">{task.title}</h3>
+                                            <p className="text-sm text-gray-500">{task.description}</p>
                                         </div>
-                                        <div className="flex-1">
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <h3 className="font-medium">{task.title}</h3>
-                                                    <p className="text-sm text-gray-500">{task.description}</p>
-                                                </div>
-                                                <span className={`px-2 py-1 text-xs rounded-full ${
-                                                    task.priority === 'High' ? 'bg-red-100 text-red-800' :
-                                                    task.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                                                    'bg-green-100 text-green-800'
-                                                }`}>
-                                                    {task.priority}
+                                        <span className={`px-2 py-1 text-xs rounded-full ${
+                                            task.priority === 'High' ? 'bg-red-100 text-red-800' :
+                                            task.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                                            'bg-green-100 text-green-800'
+                                        }`}>
+                                            {task.priority}
                                                     {/* {console.log("task.priority",task.priority)} */}
-                                                </span>
-                                            </div>
-                                            <div className="mt-2 flex items-center gap-4 text-sm text-gray-600">
+                                        </span>
+                                    </div>
+                                    <div className="mt-2 flex items-center gap-4 text-sm text-gray-600">
                                                 <span>Project: {typeof task.project === 'object' ? task.project.title : task.project}</span>
-                                                <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
-                                                {task.subtasks?.length > 0 && (
-                                                    <span>Subtasks: {task.subtasks.length}</span>
-                                                )}
+                                        <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
+                                        {task.subtasks?.length > 0 && (
+                                            <span>Subtasks: {task.subtasks.length}</span>
+                                        )}
                                                 {/* {console.log("task",task)} */}
                                                 {/* {console.log("project title",task.project.title)}
                                                 {console.log("due data",task.dueDate)}
                                                 {console.log("subtasks length",task.subtasks.length)} */}
-                                            </div>
-                                        </div>
                                     </div>
+                                </div>
+                            </div>
                                 ))
                             ) : (
-                                <p className="text-gray-500 text-center py-4">No upcoming tasks</p>
-                            )}
-                        </div>
-                    </Card>
+                            <p className="text-gray-500 text-center py-4">No upcoming tasks</p>
+                        )}
+                    </div>
+                </Card>
                 </div>
 
                 {/* Completed Tasks Row */}
                 <div className="grid grid-cols-1 gap-6">
-                    {/* Completed Tasks */}
-                    <Card className="p-6 col-span-1 bg-white shadow-xl border border-gray-100">
-                        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                            <CheckCircle className="text-green-500" size={20} />
-                            Completed Tasks
-                        </h2>
-                        <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar">
+                {/* Completed Tasks */}
+                <Card className="p-6 col-span-1 bg-white shadow-xl border border-gray-100">
+                    <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <CheckCircle className="text-green-500" size={20} />
+                        Completed Tasks
+                    </h2>
+                    <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar">
                             {isLoading ? (
                                 <div className="flex justify-center items-center h-32">
                                     <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
                                 </div>
                             ) : completedTasks.length > 0 ? (
                                 completedTasks.map((task) => (
-                                    <div 
-                                        key={task.task_id} 
-                                        className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100"
-                                        onClick={() => openTaskDetails(task)}
-                                    >
-                                        <div className="mt-1">
-                                            <CheckCircle className="text-green-500" size={20} />
+                            <div 
+                                key={task.task_id} 
+                                className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100"
+                                onClick={() => openTaskDetails(task)}
+                            >
+                                <div className="mt-1">
+                                    <CheckCircle className="text-green-500" size={20} />
+                                </div>
+                                <div className="flex-1">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <h3 className="font-medium">{task.title}</h3>
+                                            <p className="text-sm text-gray-500">{task.description}</p>
                                         </div>
-                                        <div className="flex-1">
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <h3 className="font-medium">{task.title}</h3>
-                                                    <p className="text-sm text-gray-500">{task.description}</p>
-                                                </div>
-                                                <span className={`px-2 py-1 text-xs rounded-full ${
-                                                    task.priority === 'High' ? 'bg-red-100 text-red-800' :
-                                                    task.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                                                    'bg-green-100 text-green-800'
-                                                }`}>
-                                                    {task.priority}
+                                        <span className={`px-2 py-1 text-xs rounded-full ${
+                                            task.priority === 'High' ? 'bg-red-100 text-red-800' :
+                                            task.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                                            'bg-green-100 text-green-800'
+                                        }`}>
+                                            {task.priority}
                                                     {/* {console.log("task.priority",task.priority)} */}
-                                                </span>
-                                            </div>
-                                            <div className="mt-2 flex items-center gap-4 text-sm text-gray-600">
+                                        </span>
+                                    </div>
+                                    <div className="mt-2 flex items-center gap-4 text-sm text-gray-600">
                                                     <span>Project: {typeof task.project === 'object' ? task.project.title : task.project}</span>
                                                     <span>Completed: {new Date(task.createdAt).toLocaleDateString()}</span>
-                                                    {task.subtasks?.length > 0 && (
-                                                        <span>Subtasks: {task.subtasks.length}</span>
-                                                    )}
+                                        {task.subtasks?.length > 0 && (
+                                            <span>Subtasks: {task.subtasks.length}</span>
+                                        )}
                                                     {/* {console.log("project title",task.project.title)}
                                                     {console.log("due data",task.dueDate)}
                                                     {console.log("subtasks length",task.subtasks.length)} */}
-                                            </div>
-                                        </div>
                                     </div>
+                                </div>
+                            </div>
                                 ))
                             ) : (
                                 <p className="text-gray-500 text-center py-4">No completed tasks</p>
-                            )}
-                        </div>
-                    </Card>
+                        )}
+                    </div>
+                </Card>
                 </div>
             </div>
 
