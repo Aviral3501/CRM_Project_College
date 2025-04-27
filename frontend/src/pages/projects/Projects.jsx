@@ -194,23 +194,21 @@ const Projects = () => {
 
     const handleCreateProject = async (newProject) => {
         try {
-            // Extract user_ids from selected team members
-            const teamUserIds = selectedTeamMembers.map(member => member);
-            console.log('Selected Team Members (Full Data):', selectedTeamMembers);
-            console.log('Selected Team Members (User IDs):', teamUserIds);
-            console.log('Selected Team Members Count:', selectedTeamMembers.length);
-
+            // Transform the project data to match the backend's expected format
             const projectPayload = {
-                ...newProject,
-                team: teamUserIds,
-                organization_id: userData.organization_id,
-                user_id: userData.user_id,
+                organization_id: newProject.organization_id || userData.organization_id,
+                user_id: newProject.user_id || userData.user_id,
+                project_title: newProject.name,
+                project_description: newProject.description,
+                project_status: newProject.status,
+                project_priority: newProject.priority,
+                project_dueDate: newProject.deadline,
+                project_team: newProject.team
             };
-            console.log('Complete Project Payload:', projectPayload);
-
+            
+            console.log('Sending project payload:', projectPayload);
             const response = await axios.post(`${BASE_URL}/projects/create-project`, projectPayload);
-            console.log('Create Project Response:', response.data);
-
+            
             if (response.data.success) {
                 setProjects(prev => [...prev, response.data.data]);
                 toast.success("Project created successfully");
@@ -221,26 +219,28 @@ const Projects = () => {
             }
         } catch (err) {
             console.error("Error creating project:", err);
-            console.error("Error details:", {
-                message: err.message,
-                response: err.response?.data,
-                status: err.response?.status
-            });
             setError(err.message || "An error occurred while creating the project");
             toast.error("Error creating project");
         }
     };
 
-    const handleUpdateProject = async (formData,project_id) => {
+    const handleUpdateProject = async (formData, project_id) => {
         try {
+            console.log('formData:', formData);
             const teamUserObjects = formData.team; // Already full objects!
             console.log('teamUserObjects:', teamUserObjects);
 
+            // Transform the project data to use the field names with "project_" prefix
             const projectPayload = {
-                ...formData,
-                team: teamUserObjects,
-                organization_id: userData.organization_id,
-                user_id: userData.user_id,
+                project_id: project_id,
+                organization_id: formData.organization_id || userData.organization_id,
+                user_id: formData.user_id || userData.user_id,
+                project_title: formData.project_title,
+                project_description: formData.project_description,
+                project_status: formData.project_status,
+                project_priority: formData.project_priority,
+                project_dueDate: formData.project_dueDate,
+                project_team: formData.project_team
             };
             console.log('Complete Project Payload (Update):', projectPayload);
 
@@ -759,8 +759,20 @@ const AddProjectModal = ({ isOpen, onClose, onSubmit, selectedTeamMembers, setSe
             return;
         }
 
-        console.log('Submitting project with team:', formData.team);
-        onSubmit(formData);
+        // Create a simple project object with the required fields
+        const projectData = {
+            name: formData.name,
+            description: formData.description,
+            status: formData.status,
+            deadline: formData.deadline,
+            team: formData.team,
+            priority: formData.priority,
+            organization_id: userData.organization_id,
+            user_id: userData.user_id
+        };
+
+        console.log('Submitting project:', projectData);
+        onSubmit(projectData);
         onClose();
     };
 
@@ -1281,10 +1293,23 @@ const EditProjectModal = ({ isOpen, onClose, onSubmit, project }) => {
             return;
         }
 
-        console.log('project1111:', project);
+        // Transform the form data to use the field names with "project_" prefix
+        const transformedData = {
+            project_title: formData.name,
+            project_description: formData.description,
+            project_status: formData.status,
+            project_dueDate: formData.deadline,
+            project_team: formData.team,
+            project_priority: formData.priority,
+            // tasks: formData.tasks,
+            // progress: formData.progress,
+            // project_id: project.project_id,
+            organization_id: userData.organization_id,
+            user_id: userData.user_id
+        };
 
-        onSubmit({ ...formData, project_id: project.project_id });
-        console.log('formData:', formData);
+        console.log('Submitting project with team:', transformedData);
+        onSubmit(transformedData, project.project_id);
         onClose();
     };
 
@@ -1743,5 +1768,4 @@ const DeleteConfirmationDialog = ({ isOpen, onClose, project, onConfirm }) => {
         </div>
     );
 };
-
 export default Projects; 

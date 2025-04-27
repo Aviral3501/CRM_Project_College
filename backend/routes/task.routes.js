@@ -67,7 +67,7 @@ router.post('/get-tasks', validateIds, async (req, res) => {
     try {
         const tasks = await Task.find({ organization: req.organization._id })
             .populate('assignedTo', 'name')
-            .populate('project', 'name')
+            .populate('project', 'name project_id')
             .populate('createdBy', 'name')
             .populate('updatedBy', 'name');
 
@@ -80,6 +80,7 @@ router.post('/get-tasks', validateIds, async (req, res) => {
                 status: task.status,
                 priority: task.priority,
                 project: {
+                    project_id: task.project?.project_id || null,
                     title: task.project?.name || 'Unassigned'
                 },
                 dueDate: task.dueDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
@@ -95,56 +96,138 @@ router.post('/get-tasks', validateIds, async (req, res) => {
     }
 });
 
-// Create a new task
-router.post('/create-task', validateIds, async (req, res) => {
+// Get all tasks grouped by projects
+router.post('/get-task-in-groups', validateIds, async (req, res) => {
     try {
-        const { project_id, subtasks, ...taskData } = req.body;
-        
-        // Find project by project_id
-        let projectRef = null;
-        if (project_id) {
-            projectRef = await Project.findOne({ project_id: project_id });
-            if (!projectRef) {
-                return res.status(404).json({
-                    success: false,
-                    message: "Project not found"
-                });
+        const tasks = await Task.find({ organization: req.organization._id })
+            .populate('assignedTo', 'name')
+            .populate('project', 'name project_id')
+            .populate('createdBy', 'name')
+            .populate('updatedBy', 'name');
+
+        // Group tasks by project
+        const tasksByProject = tasks.reduce((acc, task) => {
+            const projectId = task.project?.project_id || 'unassigned';
+            const projectName = task.project?.name || 'Unassigned';
+            
+            if (!acc[projectId]) {
+                acc[projectId] = {
+                    project_id: projectId,
+                    project_name: projectName,
+                    tasks: []
+                };
             }
-        }
+            
+            acc[projectId].tasks.push({
+                task_id: task.task_id,
+                title: task.title,
+                description: task.description,
+                status: task.status,
+                priority: task.priority,
+                dueDate: task.dueDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+                createdAt: task.createdAt,
+                subtasks: task.subtasks || []
+            });
+            
+            return acc;
+        }, {});
 
-        // Process subtasks if they exist
-        let processedSubtasks = [];
-        if (subtasks && subtasks.length > 0) {
-            processedSubtasks = subtasks.map(subtask => ({
-                title: subtask.title,
-                description: subtask.description || '',
-                status: subtask.status || 'Pending',
-                assignedTo: null,
-                dueDate: subtask.dueDate ? new Date(subtask.dueDate) : null
-            }));
-        }
-
-        const task = new Task({
-            ...taskData,
-            organization: req.organization._id,
-            project: projectRef?._id,
-            createdBy: req.user._id,
-            updatedBy: req.user._id,
-            subtasks: processedSubtasks
-        });
-
-        await task.save();
+        // Convert to array format
+        const groupedTasks = Object.values(tasksByProject);
 
         res.json({
             success: true,
-            data: {
+            data: groupedTasks
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Create a new task
+router.post('/create-task', validateIds, async (req, res) => {
+    try {
+        const { project_id, tasks, ...otherData } = req.body;
+        
+        // Check if project_id is provided
+        if (!project_id) {
+            return res.status(400).json({
+                success: false,
+                message: "project_id is required"
+            });
+        }
+        
+        // Find project by project_id
+        const projectRef = await Project.findOne({ project_id: project_id });
+        if (!projectRef) {
+            return res.status(404).json({
+                success: false,
+                message: "Project not found"
+            });
+        }
+
+        // Check if tasks array is provided
+        if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "At least one task is required"
+            });
+        }
+
+        // Process each task
+        const createdTasks = [];
+        for (const taskData of tasks) {
+            const { subtasks, ...singleTaskData } = taskData;
+            
+            // Process subtasks if they exist
+            let processedSubtasks = [];
+            if (subtasks && subtasks.length > 0) {
+                processedSubtasks = subtasks.map(subtask => {
+                    // Map subtask status if needed
+                    let subtaskStatus = subtask.status;
+                    if (subtaskStatus === 'Pending') {
+                        subtaskStatus = 'Not Started'; // Convert to valid subtask status
+                    }
+                    
+                    return {
+                        title: subtask.title,
+                        description: subtask.description || '',
+                        status: subtaskStatus || 'Not Started',
+                        assignedTo: null,
+                        dueDate: subtask.dueDate ? new Date(subtask.dueDate) : null
+                    };
+                });
+            }
+
+            const task = new Task({
+                ...singleTaskData,
+                organization: req.organization._id,
+                project: projectRef._id,
+                createdBy: req.user._id,
+                updatedBy: req.user._id,
+                subtasks: processedSubtasks
+            });
+
+            await task.save();
+
+            // Update the project's tasks array with the new task
+            await Project.findByIdAndUpdate(
+                projectRef._id,
+                { $push: { tasks: task._id } }
+            );
+
+            createdTasks.push({
                 task_id: task.task_id,
                 title: task.title,
                 description: task.description,
                 status: task.status,
                 priority: task.priority,
                 project: {
-                    title: projectRef?.name || 'Unassigned'
+                    project_id: projectRef.project_id,
+                    title: projectRef.name
                 },
                 dueDate: task.dueDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
                 createdAt: task.createdAt,
@@ -155,7 +238,12 @@ router.post('/create-task', validateIds, async (req, res) => {
                     assignedTo: subtask.assignedTo,
                     dueDate: subtask.dueDate?.toISOString().split('T')[0] || null
                 }))
-            }
+            });
+        }
+
+        res.json({
+            success: true,
+            data: createdTasks
         });
     } catch (error) {
         res.status(500).json({
@@ -168,67 +256,92 @@ router.post('/create-task', validateIds, async (req, res) => {
 // Update a task
 router.post('/update-task', validateIds, async (req, res) => {
     try {
-        const { task_id, project_id, subtasks, ...updateData } = req.body;
+        const { project_id, tasks, ...otherData } = req.body;
         
-        if (!task_id) {
+        // Check if project_id is provided
+        if (!project_id) {
             return res.status(400).json({
                 success: false,
-                message: "task_id is required"
+                message: "project_id is required"
             });
         }
 
-        // Find project by project_id if provided
-        let projectRef = null;
-        if (project_id) {
-            projectRef = await Project.findOne({ project_id: project_id });
-            if (!projectRef) {
-                return res.status(404).json({
-                    success: false,
-                    message: "Project not found"
-                });
-            }
-        }
-
-        // Process subtasks if they exist
-        let processedSubtasks;
-        if (subtasks) {
-            processedSubtasks = subtasks.map(subtask => ({
-                title: subtask.title,
-                description: subtask.description || '',
-                status: subtask.status || 'Pending',
-                assignedTo: null,
-                dueDate: subtask.dueDate ? new Date(subtask.dueDate) : null
-            }));
-        }
-
-        const task = await Task.findOneAndUpdate(
-            { task_id, organization: req.organization._id },
-            { 
-                ...updateData,
-                project: projectRef?._id,
-                updatedBy: req.user._id,
-                ...(processedSubtasks && { subtasks: processedSubtasks })
-            },
-            { new: true }
-        ).populate('project', 'name');
-
-        if (!task) {
+        // Find project by project_id
+        const projectRef = await Project.findOne({ project_id: project_id });
+        if (!projectRef) {
             return res.status(404).json({
                 success: false,
-                message: 'Task not found'
+                message: "Project not found"
             });
         }
 
-        res.json({
-            success: true,
-            data: {
+        // Check if tasks array is provided
+        if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "At least one task is required"
+            });
+        }
+
+        // Process each task
+        const updatedTasks = [];
+        for (const taskData of tasks) {
+            const { task_id, subtasks, ...singleTaskData } = taskData;
+            
+            if (!task_id) {
+                return res.status(400).json({
+                    success: false,
+                    message: "task_id is required for each task"
+                });
+            }
+
+            // Process subtasks if they exist
+            let processedSubtasks;
+            if (subtasks) {
+                processedSubtasks = subtasks.map(subtask => {
+                    // Map subtask status if needed
+                    let subtaskStatus = subtask.status;
+                    if (subtaskStatus === 'Pending') {
+                        subtaskStatus = 'Not Started'; // Convert to valid subtask status
+                    }
+                    
+                    return {
+                        title: subtask.title,
+                        description: subtask.description || '',
+                        status: subtaskStatus || 'Not Started',
+                        assignedTo: null,
+                        dueDate: subtask.dueDate ? new Date(subtask.dueDate) : null
+                    };
+                });
+            }
+
+            const task = await Task.findOneAndUpdate(
+                { task_id, organization: req.organization._id },
+                { 
+                    ...singleTaskData,
+                    project: projectRef._id,
+                    updatedBy: req.user._id,
+                    ...(processedSubtasks && { subtasks: processedSubtasks })
+                },
+                { new: true }
+            ).populate('project', 'name project_id');
+
+            if (!task) {
+                return res.status(404).json({
+                    success: false,
+                    message: `Task with ID ${task_id} not found`
+                });
+            }
+
+            updatedTasks.push({
                 task_id: task.task_id,
                 title: task.title,
                 description: task.description,
                 status: task.status,
                 priority: task.priority,
                 project: {
-                    title: task.project?.name || 'Unassigned'
+                    project_id: task.project.project_id,
+                    title: task.project.name
                 },
                 dueDate: task.dueDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
                 createdAt: task.createdAt,
@@ -239,7 +352,12 @@ router.post('/update-task', validateIds, async (req, res) => {
                     assignedTo: subtask.assignedTo,
                     dueDate: subtask.dueDate?.toISOString().split('T')[0] || null
                 }))
-            }
+            });
+        }
+
+        res.json({
+            success: true,
+            data: updatedTasks
         });
     } catch (error) {
         res.status(500).json({

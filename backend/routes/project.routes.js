@@ -162,12 +162,20 @@ router.post('/get-projects', validateIds, async (req, res) => {
 // Create a new project
 router.post('/create-project', validateIds, async (req, res) => {
     try {
-        const { team, tasks, ...projectData } = req.body;
+        const { 
+            project_title, 
+            project_description, 
+            project_status, 
+            project_priority, 
+            project_dueDate, 
+            project_team, 
+            ...projectData 
+        } = req.body;
         
         // Find team members by user_id
         let teamRefs = [];
-        if (team && team.length > 0) {
-            teamRefs = await Promise.all(team.map(async (member) => {
+        if (project_team && project_team.length > 0) {
+            teamRefs = await Promise.all(project_team.map(async (member) => {
                 // Handle both string user_id and object with user_id property
                 const userId = typeof member === 'string' ? member : member.user_id;
                 const user = await User.findOne({ user_id: userId });
@@ -178,66 +186,14 @@ router.post('/create-project', validateIds, async (req, res) => {
             }));
         }
 
-        // Process tasks if they exist
-        let processedTasks = [];
-        if (tasks && tasks.length > 0) {
-            processedTasks = await Promise.all(tasks.map(async (task) => {
-                // Process assignedTo for main task
-                let assignedToRefs = [];
-                if (task.assignedTo && task.assignedTo.length > 0) {
-                    assignedToRefs = await Promise.all(task.assignedTo.map(async (userId) => {
-                        // Handle both string user_id and object with user_id property
-                        const userIdentifier = typeof userId === 'string' ? userId : userId.user_id;
-                        const user = await User.findOne({ user_id: userIdentifier });
-                        if (!user) {
-                            throw new Error(`User with ID ${userIdentifier} not found`);
-                        }
-                        return user._id;
-                    }));
-                }
-
-                // Process subtasks
-                let processedSubtasks = [];
-                if (task.subtasks && task.subtasks.length > 0) {
-                    processedSubtasks = await Promise.all(task.subtasks.map(async (subtask) => {
-                        let subtaskAssignedTo = null;
-                        if (subtask.assignedTo) {
-                            // Handle both string user_id and object with user_id property
-                            const userIdentifier = typeof subtask.assignedTo === 'string' ? subtask.assignedTo : subtask.assignedTo.user_id;
-                            const user = await User.findOne({ user_id: userIdentifier });
-                            if (!user) {
-                                throw new Error(`User with ID ${userIdentifier} not found`);
-                            }
-                            subtaskAssignedTo = user._id;
-                        }
-
-                        return {
-                            title: subtask.title,
-                            description: subtask.description,
-                            status: subtask.status,
-                            assignedTo: subtaskAssignedTo,
-                            dueDate: subtask.dueDate
-                        };
-                    }));
-                }
-
-                return {
-                    title: task.title,
-                    description: task.description,
-                    status: task.status,
-                    priority: task.priority,
-                    assignedTo: assignedToRefs,
-                    dueDate: task.dueDate,
-                    subtasks: processedSubtasks
-                };
-            }));
-        }
-
         const project = new Project({
-            ...projectData,
+            name: project_title,
+            description: project_description,
+            status: project_status,
+            priority: project_priority,
+            deadline: project_dueDate ? new Date(project_dueDate) : null,
             organization: req.organization._id,
             team: teamRefs,
-            tasks: processedTasks,
             createdBy: req.user._id,
             updatedBy: req.user._id
         });
@@ -248,9 +204,7 @@ router.post('/create-project', validateIds, async (req, res) => {
         const populatedProject = await Project.findById(project._id)
             .populate('team', 'name user_id')
             .populate('createdBy', 'name user_id')
-            .populate('updatedBy', 'name user_id')
-            .populate('tasks.assignedTo', 'name user_id')
-            .populate('tasks.subtasks.assignedTo', 'name user_id');
+            .populate('updatedBy', 'name user_id');
 
         res.json({
             success: true,
@@ -262,24 +216,7 @@ router.post('/create-project', validateIds, async (req, res) => {
                 deadline: populatedProject.deadline?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
                 team: populatedProject.team.map(member => member.name),
                 progress: populatedProject.progress,
-                priority: populatedProject.priority,
-                tasks: populatedProject.tasks.map(task => ({
-                    title: task.title,
-                    description: task.description,
-                    status: task.status,
-                    priority: task.priority,
-                    assignedTo: task.assignedTo?.map(user => user.user_id) || [],
-                    dueDate: task.dueDate?.toISOString().split('T')[0] || null,
-                    subtasks: task.subtasks?.map(subtask => ({
-                        title: subtask.title,
-                        description: subtask.description,
-                        status: subtask.status,
-                        assignedTo: subtask.assignedTo?.user_id || null,
-                        dueDate: subtask.dueDate?.toISOString().split('T')[0] || null,
-                        _id: subtask._id
-                    })) || [],
-                    _id: task._id
-                }))
+                priority: populatedProject.priority
             }
         });
     } catch (error) {
@@ -293,7 +230,17 @@ router.post('/create-project', validateIds, async (req, res) => {
 // Update a project
 router.post('/update-project', validateIds, async (req, res) => {
     try {
-        const { project_id, team, tasks, ...updateData } = req.body;
+        const { 
+            project_id, 
+            project_title, 
+            project_description, 
+            project_status, 
+            project_priority, 
+            project_dueDate, 
+            project_team, 
+            tasks, 
+            ...otherData 
+        } = req.body;
         
         if (!project_id) {
             return res.status(400).json({
@@ -304,8 +251,8 @@ router.post('/update-project', validateIds, async (req, res) => {
 
         // Find team members by user_id if team is provided
         let teamRefs = null;
-        if (team && team.length > 0) {
-            teamRefs = await Promise.all(team.map(async (member) => {
+        if (project_team && project_team.length > 0) {
+            teamRefs = await Promise.all(project_team.map(async (member) => {
                 // Handle both string user_id and object with user_id property
                 const userId = typeof member === 'string' ? member : member.user_id;
                 const user = await User.findOne({ user_id: userId });
@@ -371,14 +318,22 @@ router.post('/update-project', validateIds, async (req, res) => {
             }));
         }
 
+        // Map the fields with "project_" prefix to the project model fields
+        const updateData = {
+            name: project_title,
+            description: project_description,
+            status: project_status,
+            priority: project_priority,
+            deadline: project_dueDate,
+            team: teamRefs || undefined,
+            tasks: processedTasks || undefined,
+            updatedBy: req.user._id,
+            ...otherData
+        };
+
         const project = await Project.findOneAndUpdate(
             { project_id, organization: req.organization._id },
-            { 
-                ...updateData,
-                team: teamRefs || undefined,
-                tasks: processedTasks || undefined,
-                updatedBy: req.user._id 
-            },
+            updateData,
             { new: true }
         ).populate('team', 'name user_id')
          .populate('createdBy', 'name user_id')

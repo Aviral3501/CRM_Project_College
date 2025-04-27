@@ -16,9 +16,9 @@ export const getUserTasks = async (req, res) => {
             });
         }
 
-        // Find all tasks assigned to the user
-        const tasks = await Task.find({ assignedTo: user._id })
-            .populate('project', 'project_id title')
+        // Find all tasks directly assigned to the user from Task model
+        const directTasks = await Task.find({ assignedTo: user._id })
+            .populate('project', 'project_id name')
             .populate('createdBy', 'user_id name')
             .populate({
                 path: 'subtasks',
@@ -28,9 +28,41 @@ export const getUserTasks = async (req, res) => {
                 }
             });
 
-        res.status(200).json({
-            success: true,
-            tasks: tasks.map(task => ({
+        // Find all projects where the user is assigned to tasks
+        const projectsWithUserTasks = await Project.find({
+            'tasks.assignedTo': user._id
+        }).populate('tasks.assignedTo', 'user_id name')
+          .populate('tasks.subtasks.assignedTo', 'user_id name');
+
+        // Extract tasks from projects where user is assigned
+        const projectTasks = projectsWithUserTasks.flatMap(project => 
+            project.tasks
+                .filter(task => task.assignedTo.some(assignee => assignee._id.equals(user._id)))
+                .map(task => ({
+                    task_id: task._id.toString(),
+                    title: task.title,
+                    description: task.description,
+                    status: task.status,
+                    priority: task.priority,
+                    project: {
+                        project_id: project.project_id,
+                        name: project.name
+                    },
+                    createdBy: null, // Project tasks don't track creator
+                    createdAt: task.createdAt,
+                    subtasks: task.subtasks.map(subtask => ({
+                        ...subtask.toObject(),
+                        assignedTo: subtask.assignedTo ? {
+                            user_id: subtask.assignedTo.user_id,
+                            name: subtask.assignedTo.name
+                        } : null
+                    }))
+                }))
+        );
+
+        // Combine both types of tasks
+        const allTasks = [
+            ...directTasks.map(task => ({
                 task_id: task.task_id,
                 title: task.title,
                 description: task.description,
@@ -40,7 +72,13 @@ export const getUserTasks = async (req, res) => {
                 createdBy: task.createdBy,
                 createdAt: task.createdAt,
                 subtasks: task.subtasks
-            }))
+            })),
+            ...projectTasks
+        ];
+
+        res.status(200).json({
+            success: true,
+            tasks: allTasks
         });
 
     } catch (error) {

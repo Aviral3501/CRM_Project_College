@@ -6,8 +6,8 @@ const subtaskSchema = new mongoose.Schema({
 	description: { type: String, default: "" },
 	status: { 
 		type: String, 
-		enum: ["Pending", "In Progress", "Completed"], 
-		default: "Pending" 
+		enum: ['Not Started', 'In Progress', 'On Hold', 'Completed', 'Cancelled'],
+		default: "Not Started" 
 	},
 	assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 	dueDate: { type: Date }
@@ -18,7 +18,7 @@ const taskSchema = new mongoose.Schema(
 		task_id: { type: String, unique: true }, // Custom ID for the task
 		title: { type: String, required: true },
 		description: { type: String },
-		status: { type: String, enum: ["Pending", "In Progress", "Completed"], default: "Pending" },
+		status: { type: String,enum: ['Not Started', 'In Progress', 'On Hold', 'Completed', 'Cancelled'], default: "Not Started" },
 		priority: { type: String, enum: ["Low", "Medium", "High"], default: "Medium" },
 		assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 		project: { type: mongoose.Schema.Types.ObjectId, ref: "Project" },

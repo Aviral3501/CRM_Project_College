@@ -6,8 +6,8 @@ const subtaskSchema = new mongoose.Schema({
     description: String,
     status: { 
         type: String, 
-        enum: ['Pending', 'In Progress', 'Completed'],
-        default: 'Pending'
+        enum: ['Not Started', 'In Progress', 'On Hold', 'Completed', 'Cancelled'],
+        default: 'Not Started'
     },
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     dueDate: Date
