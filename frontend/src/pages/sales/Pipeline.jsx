@@ -235,7 +235,7 @@ const Pipeline = () => {
                                 <div key={stage.id} className="w-[350px] flex-shrink-0 flex flex-col">
                                     <div className={`${stage.color} p-3 rounded-t-lg flex justify-between items-start transition-all duration-300 hover:shadow-md`}>
                                         <div>
-                                            <h3 className="font-semibold text-gray-700">{stage.title}</h3>
+                            <h3 className="font-semibold text-gray-700">{stage.title}</h3>
                                             <p className="text-xs text-gray-500">{stage.description}</p>
                                         </div>
                                         <div className="flex items-center">
@@ -269,24 +269,24 @@ const Pipeline = () => {
 }} className="text-blue-500 hover:text-blue-700"><Edit size={18} /></button>
                                                                 <button onClick={() => { setSelectedPipeline(deal); setShowDeleteModal(true); }} className="text-red-500 hover:text-red-700"><Trash2 size={18} /></button>
                                                             </div>
-                                                        </div>
-                                                        
+                        </div>
+                        
                                                         <div className="space-y-2 flex-grow overflow-y-auto">
-                                                            <div className="flex items-center text-sm text-gray-600">
-                                                                <DollarSign size={16} className="mr-2" />
+                                        <div className="flex items-center text-sm text-gray-600">
+                                            <DollarSign size={16} className="mr-2" />
                                                                 ${deal.amount.toLocaleString()}
-                                                            </div>
+                                        </div>
                                                             
                                                             {deal.lead && (
-                                                                <div className="flex items-center text-sm text-gray-600">
-                                                                    <Users size={16} className="mr-2" />
+                                        <div className="flex items-center text-sm text-gray-600">
+                                            <Users size={16} className="mr-2" />
                                                                     {deal.lead.company || deal.lead.name}
-                                                                </div>
+                                        </div>
                                                             )}
                                                             
                                                             {deal.expectedCloseDate && (
-                                                                <div className="flex items-center text-sm text-gray-600">
-                                                                    <Calendar size={16} className="mr-2" />
+                                        <div className="flex items-center text-sm text-gray-600">
+                                            <Calendar size={16} className="mr-2" />
                                                                     {new Date(deal.expectedCloseDate).toLocaleDateString()}
                                                                     {daysUntilClose !== null && (
                                                                         <span className={`ml-2 text-xs ${daysUntilClose < 0 ? 'text-red-500' : daysUntilClose <= 7 ? 'text-orange-500' : 'text-green-500'}`}>
@@ -382,7 +382,7 @@ const Pipeline = () => {
                                         ) : (
                                             <div className="text-center py-8 text-gray-400 bg-white rounded-lg border border-dashed border-gray-200 transition-all duration-300 hover:border-gray-300">
                                                 <p>No deals in this stage</p>
-                                            </div>
+                                        </div>
                                         )}
                                     </div>
 
@@ -450,7 +450,7 @@ const Pipeline = () => {
                             </div>
                         </form>
                     </div>
-                </div>
+            </div>
             )}
         </div>
     );

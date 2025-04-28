@@ -61,7 +61,7 @@ const Sidebar = () => {
         <div className="h-screen w-64 bg-gray-900 text-white p-4 fixed left-0 top-0 z-[45]">
             <div className="flex items-center gap-2 mb-8">
                 <UserCircle size={32} className="text-green-500" />
-                <h1 className="text-xl font-bold">CRM Pro</h1>
+                <h1 className="text-xl font-bold">TrackSta</h1>
             </div>
             
             <nav>
