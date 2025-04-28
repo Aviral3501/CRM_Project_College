@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import Card from '../../components/ui/Card';
-import { Plus, Search, Filter, Edit, Trash2, X, Check, ChevronDown } from 'lucide-react';
+import { Plus, Search, Filter, Edit, Trash2, X, Check, ChevronDown, ArrowRight } from 'lucide-react';
 import { useUser } from '../../context/UserContext';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -1060,6 +1060,35 @@ function highlightMatch(text, filter, fieldType) {
     return <span className="bg-yellow-100 rounded px-1">{text}</span>;
 }
 
+const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message }) => {
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center p-4 z-50 backdrop-blur-sm transition-all duration-300 ease-in-out">
+            <div className="bg-white rounded-xl w-[400px] shadow-lg transform transition-all duration-300 ease-in-out scale-100 opacity-100">
+                <div className="p-6">
+                    <h2 className="text-xl font-semibold text-gray-800 mb-2">{title}</h2>
+                    <p className="text-gray-600">{message}</p>
+                </div>
+                <div className="flex justify-end gap-3 p-4 border-t border-gray-100">
+                    <button
+                        onClick={onClose}
+                        className="px-4 py-2 border border-gray-200 rounded-md text-gray-600 hover:bg-gray-50 transition-colors duration-200"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={onConfirm}
+                        className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors duration-200"
+                    >
+                        Confirm
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const Leads = () => {
     const [leads, setLeads] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -1068,10 +1097,12 @@ const Leads = () => {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [selectedLead, setSelectedLead] = useState(null);
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [filters, setFilters] = useState([]);
     const [filteredLeads, setFilteredLeads] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const { userData, BASE_URL } = useUser();
+    const [isConverting, setIsConverting] = useState(false);
 
     useEffect(() => {
         fetchLeads();
@@ -1174,7 +1205,10 @@ const Leads = () => {
 
     const handleDeleteLeads = async () => {
         if (selectedLeads.length === 0) return;
+        setIsDeleteModalOpen(true);
+    };
 
+    const handleConfirmDelete = async () => {
         try {
             const response = await axios.post(`${BASE_URL}/leads/delete-lead`, {
                 organization_id: userData.organization_id,
@@ -1192,7 +1226,14 @@ const Leads = () => {
         } catch (error) {
             console.error("Error deleting leads:", error);
             toast.error(error.response?.data?.message || "Failed to delete leads. Please try again.");
+        } finally {
+            setIsDeleteModalOpen(false);
         }
+    };
+
+    const handleCancelDelete = () => {
+        setIsDeleteModalOpen(false);
+        setSelectedLeads([]);
     };
 
     const handleAddLead = (newLead) => {
@@ -1203,6 +1244,37 @@ const Leads = () => {
         setLeads(prev => prev.map(lead => 
             lead.lead_id === updatedLead.lead_id ? updatedLead : lead
         ));
+    };
+
+    const handleConvertToPipeline = async () => {
+        if (selectedLeads.length === 0) {
+            toast.error("Please select at least one lead to convert");
+            return;
+        }
+
+        try {
+            setIsConverting(true);
+            const response = await axios.post(`${BASE_URL}/pipeline/generate-pipeline-from-leads`, {
+                organization_id: userData.organization_id,
+                user_id: userData.user_id,
+                lead_ids: selectedLeads,
+                stage: 'Qualified' // Force default stage to Qualified
+            });
+
+            if (response.data.success) {
+                toast.success(response.data.message);
+                setSelectedLeads([]);
+                // Remove converted leads from the table
+                setLeads(prev => prev.filter(lead => !selectedLeads.includes(lead.lead_id)));
+            } else {
+                toast.error(response.data.message || "Failed to convert leads to pipeline");
+            }
+        } catch (error) {
+            console.error("Error converting leads to pipeline:", error);
+            toast.error(error.response?.data?.message || "Failed to convert leads to pipeline. Please try again.");
+        } finally {
+            setIsConverting(false);
+        }
     };
 
     const applyFilters = () => {
@@ -1271,7 +1343,8 @@ const Leads = () => {
     };
 
     return (
-        <div className="p-6 bg-gray-50 min-h-screen">
+        <div className='w-full h-screen max-w-[1600px] mx-auto px-4'>
+              <div className="p-6 bg-gray-50 min-h-screen">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold text-gray-800">Leads</h1>
                 <button 
@@ -1332,26 +1405,44 @@ const Leads = () => {
                                                </div>
                                             </button>
                                         )}
-                                         {selectedLeads.length >= 1 && (
-                                             <button 
-                                             onClick={handleDeleteLeads}
-                                             className="w-[100px] h-10 bg-red-400 text-white rounded-md flex items-center justify-center hover:bg-red-500 transition-all duration-200 transform hover:scale-105 hover:shadow-md"
-                                         >
-                                            <div className="flex items-center gap-2">
-                                            <Trash2 size={18} />
-                                            <span className="text-sm">Delete</span>
-                                            </div>
-                                         </button>
-                                         ) }
+                                        {selectedLeads.length >= 1 && (
+                                            <button 
+                                                onClick={handleDeleteLeads}
+                                                className="w-[100px] h-10 bg-red-400 text-white rounded-md flex items-center justify-center hover:bg-red-500 transition-all duration-200 transform hover:scale-105 hover:shadow-md"
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                <Trash2 size={18} />
+                                                <span className="text-sm">Delete</span>
+                                                </div>
+                                            </button>
+                                        )}
+                                        {selectedLeads.length >= 1 && (
+                                            <button 
+                                                onClick={handleConvertToPipeline}
+                                                disabled={isConverting}
+                                                className="w-[160px] h-10 bg-green-500 text-white rounded-md flex items-center justify-center hover:bg-green-600 transition-all duration-200 transform hover:scale-105 hover:shadow-md"
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                {isConverting ? (
+                                                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                                                ) : (
+                                                    <ArrowRight size={18} />
+                                                )}
+                                                <span className="text-sm">
+                                                    {isConverting ? "Converting..." : "Convert to Pipeline"}
+                                                </span>
+                                                </div>
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             </div>
-                            <div className="h-[calc(100vh-300px)] overflow-y-auto overflow-x-auto">
-                                <div className="min-w-[1200px] max-w-[1200px] mx-auto">
+                            <div className="h-[calc(100vh-300px)] overflow-y-auto overflow-x-auto w-full">
+                                <div className="w-full">
                                     <table className="w-full table-fixed divide-y divide-gray-200">
                                         <thead className="bg-gray-50">
                                             <tr>
-                                                <th className="w-[150px] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                                <th className="w-[150px]  px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                                                     <div className="flex items-center">
                                                         <input
                                                             type="checkbox"
@@ -1361,23 +1452,23 @@ const Leads = () => {
                                                         />
                                                     </div>
                                                 </th>
-                                                <th className="w-[150px] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                                                <th className="w-[150px] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                                                <th className="w-[150px] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
-                                                <th className="w-[150px] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Company</th>
-                                                <th className="w-[150px] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
-                                                <th className="w-[150px] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Budget</th>
-                                                <th className="w-[150px] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
-                                                <th className="w-[150px] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Expected Close</th>
-                                                <th className="w-[150px] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                                                <th className="w-[150px] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Assigned To</th>
-                                                <th className="w-[150px] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created At</th>
+                                                <th className="w-[150px] xl:w-[250px] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                                                <th className="w-[150px] xl:w-[250px] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                                                <th className="w-[150px] xl:w-[250px] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                                                <th className="w-[150px] xl:w-[250px] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Company</th>
+                                                <th className="w-[150px] xl:w-[250px] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
+                                                <th className="w-[150px] xl:w-[250px] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Budget</th>
+                                                <th className="w-[150px] xl:w-[250px] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
+                                                <th className="w-[150px] xl:w-[250px] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Expected Close</th>
+                                                <th className="w-[150px] xl:w-[250px] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                                <th className="w-[150px] xl:w-[250px] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Assigned To</th>
+                                                <th className="w-[150px] xl:w-[250px] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created At</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="bg-white divide-y divide-gray-100">
+                                        <tbody className="bg-white divide-y divide-gray-100 ">
                                             {filteredLeads.map((lead) => (
                                                 <tr key={lead.lead_id} className="hover:bg-gray-50 transition-colors duration-150">
-                                                    <td className="w-[150px] px-6 py-4 whitespace-nowrap">
+                                                    <td className="w-[50px]   px-6 py-4 whitespace-nowrap">
                                                         <input
                                                             type="checkbox"
                                                             checked={selectedLeads.includes(lead.lead_id)}
@@ -1385,42 +1476,42 @@ const Leads = () => {
                                                             className="h-4 w-4 text-blue-400 rounded border-gray-300 focus:ring-blue-200"
                                                         />
                                                     </td>
-                                                    <td className="w-[150px] px-6 py-4 whitespace-nowrap text-gray-700 truncate" title={lead.name}>
+                                                    <td className="w-[150px] xl:w-[250px] px-6 py-4 whitespace-nowrap text-gray-700 truncate" title={lead.name}>
                                                         {(() => {
                                                             const filter = filters.find(f => f.field === 'name');
                                                             if (filter) return highlightMatch(lead.name, filter, 'string');
                                                             return searchQuery ? highlightSearchMatch(lead.name, searchQuery) : lead.name;
                                                         })()}
                                                     </td>
-                                                    <td className="w-[150px] px-6 py-4 whitespace-nowrap text-gray-700 truncate" title={lead.email}>
+                                                    <td className="w-[150px] xl:w-[250px] px-6 py-4 whitespace-nowrap text-gray-700 truncate" title={lead.email}>
                                                         {(() => {
                                                             const filter = filters.find(f => f.field === 'email');
                                                             if (filter) return highlightMatch(lead.email, filter, 'string');
                                                             return searchQuery ? highlightSearchMatch(lead.email, searchQuery) : lead.email;
                                                         })()}
                                                     </td>
-                                                    <td className="w-[150px] px-6 py-4 whitespace-nowrap text-gray-700 truncate" title={lead.phone}>
+                                                    <td className="w-[150px] xl:w-[250px] px-6 py-4 whitespace-nowrap text-gray-700 truncate" title={lead.phone}>
                                                         {(() => {
                                                             const filter = filters.find(f => f.field === 'phone');
                                                             if (filter) return highlightMatch(lead.phone, filter, 'string');
                                                             return searchQuery ? highlightSearchMatch(lead.phone, searchQuery) : lead.phone;
                                                         })()}
                                                     </td>
-                                                    <td className="w-[150px] px-6 py-4 whitespace-nowrap text-gray-700 truncate" title={lead.company || '-'}>
+                                                    <td className="w-[150px] xl:w-[250px] px-6 py-4 whitespace-nowrap text-gray-700 truncate" title={lead.company || '-'}>
                                                         {(() => {
                                                             const filter = filters.find(f => f.field === 'company');
                                                             if (filter) return highlightMatch(lead.company, filter, 'string');
                                                             return searchQuery ? highlightSearchMatch(lead.company || '-', searchQuery) : (lead.company || '-');
                                                         })()}
                                                     </td>
-                                                    <td className="w-[150px] px-6 py-4 whitespace-nowrap text-gray-700 truncate" title={lead.source || '-'}>
+                                                    <td className="w-[150px] xl:w-[250px] px-6 py-4 whitespace-nowrap text-gray-700 truncate" title={lead.source || '-'}>
                                                         {(() => {
                                                             const filter = filters.find(f => f.field === 'source');
                                                             if (filter) return highlightMatch(lead.source, filter, 'string');
                                                             return searchQuery ? highlightSearchMatch(lead.source || '-', searchQuery) : (lead.source || '-');
                                                         })()}
                                                     </td>
-                                                    <td className="w-[150px] px-6 py-4 whitespace-nowrap text-gray-700 truncate" title={lead.budget ? `$${lead.budget.toLocaleString()}` : '-'}>
+                                                    <td className="w-[150px] xl:w-[250px] px-6 py-4 whitespace-nowrap text-gray-700 truncate" title={lead.budget ? `$${lead.budget.toLocaleString()}` : '-'}>
                                                         {(() => {
                                                             const filter = filters.find(f => f.field === 'budget');
                                                             const budgetText = lead.budget ? `$${lead.budget.toLocaleString()}` : '-';
@@ -1428,7 +1519,7 @@ const Leads = () => {
                                                             return searchQuery ? highlightSearchMatch(budgetText, searchQuery) : budgetText;
                                                         })()}
                                                     </td>
-                                                    <td className="w-[150px] px-6 py-4 whitespace-nowrap">
+                                                    <td className="w-[150px] xl:w-[250px] px-6 py-4 whitespace-nowrap">
                                                         {(() => {
                                                             const filter = filters.find(f => f.field === 'priority');
                                                             const val = lead.priority.charAt(0).toUpperCase() + lead.priority.slice(1);
@@ -1451,7 +1542,7 @@ const Leads = () => {
                                                             );
                                                         })()}
                                                     </td>
-                                                    <td className="w-[150px] px-6 py-4 whitespace-nowrap text-gray-700 truncate" title={lead.expectedCloseDate ? new Date(lead.expectedCloseDate).toLocaleDateString() : '-'}>
+                                                    <td className="w-[150px] xl:w-[250px] px-6 py-4 whitespace-nowrap text-gray-700 truncate" title={lead.expectedCloseDate ? new Date(lead.expectedCloseDate).toLocaleDateString() : '-'}>
                                                         {(() => {
                                                             const filter = filters.find(f => f.field === 'expectedCloseDate');
                                                             const val = lead.expectedCloseDate ? new Date(lead.expectedCloseDate).toLocaleDateString() : '-';
@@ -1459,7 +1550,7 @@ const Leads = () => {
                                                             return val;
                                                         })()}
                                                     </td>
-                                                    <td className="w-[150px] px-6 py-4 whitespace-nowrap">
+                                                    <td className="w-[150px] xl:w-[250px] px-6 py-4 whitespace-nowrap">
                                                         {(() => {
                                                             const filter = filters.find(f => f.field === 'status');
                                                             return filter ? (
@@ -1483,13 +1574,13 @@ const Leads = () => {
                                                             );
                                                         })()}
                                                     </td>
-                                                    <td className="w-[150px] px-6 py-4 whitespace-nowrap text-gray-700 truncate" title={lead.assignedTo}>
+                                                    <td className="w-[150px] xl:w-[250px] px-6 py-4 whitespace-nowrap text-gray-700 truncate" title={lead.assignedTo}>
                                                         {(() => {
                                                             const filter = filters.find(f => f.field === 'assignedTo');
                                                             return filter ? highlightMatch(lead.assignedTo, filter, 'string') : lead.assignedTo;
                                                         })()}
                                                     </td>
-                                                    <td className="w-[150px] px-6 py-4 whitespace-nowrap text-gray-700 truncate" title={new Date(lead.createdAt).toLocaleDateString()}>
+                                                    <td className="w-[150px] xl:w-[250px] px-6 py-4 whitespace-nowrap text-gray-700 truncate" title={new Date(lead.createdAt).toLocaleDateString()}>
                                                         {(() => {
                                                             const filter = filters.find(f => f.field === 'createdAt');
                                                             const val = new Date(lead.createdAt).toLocaleDateString();
@@ -1541,7 +1632,18 @@ const Leads = () => {
                 onSubmit={handleUpdateLead}
                 initialData={selectedLead}
             />
+
+            {/* Delete Confirmation Modal */}
+            <ConfirmationModal
+                isOpen={isDeleteModalOpen}
+                onClose={handleCancelDelete}
+                onConfirm={handleConfirmDelete}
+                title="Delete Leads"
+                message={`Are you sure you want to delete ${selectedLeads.length} lead${selectedLeads.length > 1 ? 's' : ''}? This action cannot be undone.`}
+            />
         </div>
+        </div>
+      
     );
 };
 
