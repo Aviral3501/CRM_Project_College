@@ -180,7 +180,11 @@ const Pipeline = () => {
     // Edit pipeline handler
     const handleEditPipeline = (deal) => {
         setSelectedPipeline(deal);
-        setEditForm({ ...deal });
+        setEditForm({
+            ...deal,
+            client: deal.client,
+            client_id: deal.client_id
+        });
         setShowEditModal(true);
     };
 
@@ -205,7 +209,8 @@ const Pipeline = () => {
                 stage: editForm.stage,
                 expectedCloseDate: editForm.expectedCloseDate,
                 notes: editForm.notes,
-                probability: editForm.probability
+                probability: editForm.probability,
+                client_id: editForm.client_id
             });
             setPipelineDeals(prev => prev.map(d => d.pipeline_id === editForm.pipeline_id ? { ...d, ...editForm } : d));
             toast.success('Pipeline updated successfully');
@@ -213,7 +218,8 @@ const Pipeline = () => {
             setEditForm(null);
             setSelectedPipeline(null);
         } catch (error) {
-            toast.error('Failed to update pipeline');
+            console.error('Error updating pipeline:', error);
+            toast.error(error.response?.data?.message || 'Failed to update pipeline');
         } finally {
             setIsProcessing(false);
         }

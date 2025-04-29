@@ -5,6 +5,7 @@ import { User } from '../models/user.model.js';
 import { Lead } from '../models/lead.model.js';
 import { Quote } from '../models/quote.model.js';
 import { protectRoute } from '../middleware/protectRoute.js';
+import { Client } from '../models/client.model.js';
 
 const router = express.Router();
 
@@ -70,7 +71,7 @@ router.post('/get-pipeline', validateIds, async (req, res) => {
         
         const pipeline = await Pipeline.find({ organization: organization._id })
             .populate('lead', 'name email company')
-            .populate('client', 'name email company')
+            .populate('client', 'client_id name email company')
             .populate('assignedTo', 'name user_id')
             .populate('createdBy', 'name')
             .populate('updatedBy', 'name');
@@ -88,11 +89,13 @@ router.post('/get-pipeline', validateIds, async (req, res) => {
                     company: deal.lead.company
                 } : null,
                 client: deal.client ? {
+                    client_id: deal.client.client_id,
                     name: deal.client.name,
                     email: deal.client.email,
                     company: deal.client.company
                 } : null,
                 assignedTo: deal.assignedTo?.name || 'Unassigned',
+                client_id:deal.client ? deal.client.client_id : null,
                 assignedToId: deal.assignedTo?.user_id || null,
                 expectedCloseDate: deal.expectedCloseDate,
                 notes: deal.notes,
@@ -214,7 +217,7 @@ router.post('/create-pipeline', validateIds, async (req, res) => {
 // Update a pipeline deal
 router.post('/update-pipeline', validateIds, async (req, res) => {
     try {
-        const { organization_id, user_id, pipeline_id, ...updateData } = req.body;
+        const { organization_id, user_id, pipeline_id, client_id, ...updateData } = req.body;
         
         // Find organization by org_id
         const organization = await Organization.findOne({ org_id: organization_id });
@@ -234,16 +237,30 @@ router.post('/update-pipeline', validateIds, async (req, res) => {
             });
         }
 
+        // If client_id is provided, look up the client
+        let clientRef = undefined;
+        if (client_id) {
+            const client = await Client.findOne({ client_id });
+            if (!client) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Client not found'
+                });
+            }
+            clientRef = client._id;
+        }
+
         const pipeline = await Pipeline.findOneAndUpdate(
             { pipeline_id, organization: organization._id },
             { 
                 ...updateData,
+                ...(clientRef && { client: clientRef }), // Only include client if we found one
                 updatedBy: user._id
             },
             { new: true }
         )
         .populate('lead', 'name email company')
-        .populate('client', 'name email company')
+        .populate('client', 'client_id name email company')  // Include client_id in population
         .populate('assignedTo', 'name user_id')
         .populate('createdBy', 'name')
         .populate('updatedBy', 'name');
@@ -256,7 +273,6 @@ router.post('/update-pipeline', validateIds, async (req, res) => {
         }
 
         // Check if the pipeline deal has reached the final stage (Negotiation)
-        // If so, create a quote automatically
         if (pipeline.stage === "Negotiation") {
             // Check if a quote already exists for this pipeline
             const existingQuote = await Quote.findOne({ pipeline: pipeline._id });
@@ -300,10 +316,12 @@ router.post('/update-pipeline', validateIds, async (req, res) => {
                     company: pipeline.lead.company
                 } : null,
                 client: pipeline.client ? {
+                    client_id: pipeline.client.client_id,  // Include client_id in response
                     name: pipeline.client.name,
                     email: pipeline.client.email,
                     company: pipeline.client.company
                 } : null,
+                client_id: pipeline.client?.client_id || null,  // Include client_id at top level
                 assignedTo: pipeline.assignedTo?.name || 'Unassigned',
                 assignedToId: pipeline.assignedTo?.user_id || null,
                 expectedCloseDate: pipeline.expectedCloseDate,
@@ -363,126 +381,112 @@ router.post('/delete-pipeline', validateIds, async (req, res) => {
 // Generate pipeline deals from selected leads
 router.post('/generate-pipeline-from-leads', validateIds, async (req, res) => {
     try {
-        const { organization_id, user_id, lead_ids } = req.body;
-        
-        // Find organization by org_id
+        const { organization_id, user_id, lead_ids, stage, client_id } = req.body;
+
+        // Validate input
+        if (!organization_id || !user_id || !lead_ids || !Array.isArray(lead_ids) || lead_ids.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid input parameters"
+            });
+        }
+
+        // Get organization and user using findOne instead of findById
         const organization = await Organization.findOne({ org_id: organization_id });
-        if (!organization) {
+        const user = await User.findOne({ user_id: user_id });
+
+        if (!organization || !user) {
             return res.status(404).json({
                 success: false,
-                message: 'Organization not found'
+                message: "Organization or user not found"
             });
         }
 
-        // Find user by user_id
-        const user = await User.findOne({ user_id });
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: 'User not found'
-            });
-        }
-
-        // Convert single lead_id to array if needed
-        const leadIdsArray = Array.isArray(lead_ids) ? lead_ids : [lead_ids];
-        
-        // Find all leads with the provided lead_ids
+        // Get leads
         const leads = await Lead.find({
-            lead_id: { $in: leadIdsArray },
+            lead_id: { $in: lead_ids },
             organization: organization._id
         });
 
-        if (leads.length === 0) {
+        if (!leads || leads.length === 0) {
             return res.status(404).json({
                 success: false,
-                message: 'No leads found to convert'
+                message: "No leads found"
             });
         }
 
         // Create pipeline deals for each lead
-        const createdPipelines = [];
-        
-        for (const lead of leads) {
-            // Check if a pipeline already exists for this lead
-            const existingPipeline = await Pipeline.findOne({ lead: lead._id });
-            
-            if (existingPipeline) {
-                // Skip if pipeline already exists
-                continue;
-            }
-
-            // Determine initial stage based on lead status
-            // Use provided stage if present, otherwise fallback to old logic
-            let initialStage = req.body.stage || "Proposal";
-            if (!req.body.stage) {
-                if (lead.status === "Qualified") {
-                    initialStage = "Negotiation";
-                } else if (lead.status === "Lost") {
-                    initialStage = "Closed Lost";
+        const pipelinePromises = leads.map(async (lead) => {
+            // Look up the client if client_id is provided or if lead has a client
+            let clientRef = null;
+            if (client_id) {
+                const client = await Client.findOne({ client_id: client_id });
+                if (client) {
+                    clientRef = client._id;
+                }
+            } else if (lead.client?.client_id) {
+                const client = await Client.findOne({ client_id: lead.client.client_id });
+                if (client) {
+                    clientRef = client._id;
                 }
             }
 
-            // Create a new pipeline deal
-            const pipeline = new Pipeline({
-                title: `${lead.company || 'Unknown Company'} - ${lead.name}`,
-                amount: lead.budget || 0,
-                stage: initialStage,
-                lead: lead._id,
-                assignedTo: lead.assignedTo,
+            // Look up assigned user if present
+            let assignedToRef = user._id; // default to current user
+            if (lead.assignedTo) {
+                const assignedUser = await User.findOne({ user_id: lead.assignedTo });
+                if (assignedUser) {
+                    assignedToRef = assignedUser._id;
+                }
+            }
+
+            const pipelineDeal = new Pipeline({
                 organization: organization._id,
+                title: lead.name,
+                description: lead.notes || '',
+                stage: stage || 'Qualified',
+                amount: lead.budget || 0,
+                expectedCloseDate: lead.expectedCloseDate || new Date(),
+                assignedTo: assignedToRef,
+                client: clientRef, // Use the looked-up client reference
                 createdBy: user._id,
                 updatedBy: user._id,
-                expectedCloseDate: lead.expectedCloseDate,
-                notes: lead.notes,
-                probability: lead.status === "Qualified" ? 70 : 30,
-                products: [] // Empty products array initially
+                tags: lead.tags || [],
+                priority: lead.priority || 'Medium',
+                status: 'Active',
+                probability: 50,
+                products: [],
+                notes: lead.notes || '',
+                contact_info: {
+                    email: lead.email || '',
+                    phone: lead.phone || '',
+                    company: lead.company || ''
+                }
             });
 
-            await pipeline.save();
-            
-            // Populate the response
-            const populatedPipeline = await Pipeline.findById(pipeline._id)
-                .populate('lead', 'name email company')
-                .populate('client', 'name email company')
-                .populate('assignedTo', 'name user_id')
-                .populate('createdBy', 'name')
-                .populate('updatedBy', 'name');
-                
-            createdPipelines.push({
-                pipeline_id: populatedPipeline.pipeline_id,
-                title: populatedPipeline.title,
-                amount: populatedPipeline.amount,
-                stage: populatedPipeline.stage,
-                lead: populatedPipeline.lead ? {
-                    name: populatedPipeline.lead.name,
-                    email: populatedPipeline.lead.email,
-                    company: populatedPipeline.lead.company
-                } : null,
-                client: populatedPipeline.client ? {
-                    name: populatedPipeline.client.name,
-                    email: populatedPipeline.client.email,
-                    company: populatedPipeline.client.company
-                } : null,
-                assignedTo: populatedPipeline.assignedTo?.name || 'Unassigned',
-                assignedToId: populatedPipeline.assignedTo?.user_id || null,
-                expectedCloseDate: populatedPipeline.expectedCloseDate,
-                notes: populatedPipeline.notes,
-                probability: populatedPipeline.probability,
-                products: populatedPipeline.products,
-                createdAt: populatedPipeline.createdAt,
-                updatedAt: populatedPipeline.updatedAt
-            });
-        }
-
-        res.json({
-            success: true,
-            message: `${createdPipelines.length} pipeline deal(s) created successfully`,
-            data: createdPipelines
+            await pipelineDeal.save();
+            return pipelineDeal;
         });
+
+        await Promise.all(pipelinePromises);
+
+        // Update leads status to 'Converted'
+        await Lead.updateMany(
+            { lead_id: { $in: lead_ids }, organization: organization._id },
+            { $set: { status: 'Converted' } }
+        );
+
+        res.status(200).json({
+            success: true,
+            message: "Leads successfully converted to pipeline deals"
+        });
+
     } catch (error) {
+        console.error('Error in generate-pipeline-from-leads:', error);
         res.status(500).json({
             success: false,
-            message: error.message
+            message: "Internal server error",
+            error: error.message
         });
     }
 });

@@ -1426,11 +1426,15 @@ const Leads = () => {
 
         try {
             setIsConverting(true);
+            // Get the selected lead to access its client_id
+            const selectedLead = filteredLeads.find(lead => lead.lead_id === selectedLeads[0]);
+            
             const response = await axios.post(`${BASE_URL}/pipeline/generate-pipeline-from-leads`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id,
                 lead_ids: selectedLeads,
-                stage: 'Qualified' // Force default stage to Qualified
+                stage: 'Qualified', // Force default stage to Qualified
+                client_id: selectedLead?.client?.client_id || null // Include client_id from the lead
             });
 
             if (response.data.success) {
