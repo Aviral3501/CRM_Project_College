@@ -6,6 +6,22 @@ import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import { useUser } from '../../context/UserContext';
 
+// HighlightedText component for search results
+const HighlightedText = ({ text, highlight }) => {
+    if (!highlight) return <span>{text}</span>;
+    
+    const parts = text.split(new RegExp(`(${highlight})`, 'gi'));
+    return (
+        <span>
+            {parts.map((part, i) => 
+                part.toLowerCase() === highlight.toLowerCase() ? 
+                    <span key={i} className="bg-yellow-200">{part}</span> : 
+                    part
+            )}
+        </span>
+    );
+};
+
 // Customer Form Modal (used for creating new clients only)
 const CustomerFormModal = ({ isOpen, onClose, onSubmit }) => {
     const [formData, setFormData] = useState({
@@ -2077,8 +2093,12 @@ const Customers = () => {
                         <Card key={client.client_id} className="p-6">
                         <div className="flex justify-between items-start mb-4">
                             <div>
-                                    <h3 className="text-lg font-semibold">{client.name}</h3>
-                                    <p className="text-sm text-gray-500">{client.company}</p>
+                                    <h3 className="text-lg font-semibold">
+                                        <HighlightedText text={client.name} highlight={filters.text} />
+                                    </h3>
+                                    <p className="text-sm text-gray-500">
+                                        <HighlightedText text={client.company} highlight={filters.text} />
+                                    </p>
                             </div>
                                 <div className="relative client-menu">
                                 <button 
@@ -2122,13 +2142,13 @@ const Customers = () => {
                         </div>
 
                         <div className="space-y-3">
-                            <div className="flex items-center text-sm text-gray-600">
-                                <Mail size={16} className="mr-2" />
-                                    {client.email}
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                                <Mail className="w-4 h-4" />
+                                <HighlightedText text={client.email} highlight={filters.text} />
                             </div>
-                            <div className="flex items-center text-sm text-gray-600">
-                                <Phone size={16} className="mr-2" />
-                                    {client.phone}
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                                <Phone className="w-4 h-4" />
+                                <HighlightedText text={client.phone} highlight={filters.text} />
                             </div>
                             <div className="flex items-center text-sm text-gray-600">
                                 <MapPin size={16} className="mr-2" />
