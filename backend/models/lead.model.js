@@ -19,6 +19,11 @@ const leadSchema = new mongoose.Schema(
 		organization: { type: mongoose.Schema.Types.ObjectId, ref: "Organization", required: true },
 		createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 		updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+		client_id: { type: String }, // Add client_id field
+		client: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: 'Client'
+		},
 	},
 	{ timestamps: true }
 );

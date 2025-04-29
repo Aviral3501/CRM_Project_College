@@ -29,13 +29,43 @@ const CreateLeadModal = ({ isOpen, onClose, onSubmit }) => {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [tagInput, setTagInput] = useState('');
     const { userData, BASE_URL } = useUser();
+    
+    // New state for clients
+    const [clients, setClients] = useState([]);
+    const [isLoadingClients, setIsLoadingClients] = useState(false);
+    const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
+    const [selectedClient, setSelectedClient] = useState(null);
 
     useEffect(() => {
         if (isOpen) {
             fetchEmployees();
+            fetchClients();
             setFormData(initialFormState);
+            setSelectedClient(null);
         }
     }, [isOpen]);
+
+    // New function to fetch clients
+    const fetchClients = async () => {
+        try {
+            setIsLoadingClients(true);
+            const response = await axios.post(`${BASE_URL}/clients/get-clients`, {
+                organization_id: userData.organization_id,
+                user_id: userData.user_id
+            });
+
+            if (response.data.success) {
+                setClients(response.data.data);
+            } else {
+                toast.error("Failed to fetch clients");
+            }
+        } catch (error) {
+            console.error("Error fetching clients:", error);
+            toast.error("Failed to fetch clients. Please try again.");
+        } finally {
+            setIsLoadingClients(false);
+        }
+    };
 
     const fetchEmployees = async () => {
         try {
@@ -64,6 +94,19 @@ const CreateLeadModal = ({ isOpen, onClose, onSubmit }) => {
             ...prev,
             [name]: value
         }));
+    };
+
+    // New function to handle client selection
+    const handleClientSelect = (client) => {
+        setSelectedClient(client);
+        setFormData(prev => ({
+            ...prev,
+            company: client.company,
+            phone: client.phone,
+            notes: client.notes || '',
+            tags: client.tags || []
+        }));
+        setIsClientDropdownOpen(false);
     };
 
     const handleEmployeeSelect = (employee) => {
@@ -111,12 +154,17 @@ const CreateLeadModal = ({ isOpen, onClose, onSubmit }) => {
                 notes: formData.notes,
                 tags: formData.tags,
                 budget: formData.budget ? Number(formData.budget) : undefined,
-                expectedCloseDate: formData.expectedCloseDate
+                expectedCloseDate: formData.expectedCloseDate,
             };
 
             // Only include assignedTo if it's not empty
             if (formData.assignedToId) {
                 payload.assignedTo = formData.assignedToId;
+            }
+            
+            // Include client_id if a client is selected
+            if (selectedClient) {
+                payload.client_id = selectedClient.client_id;
             }
 
             const response = await axios.post(`${BASE_URL}/leads/create-lead`, payload);
@@ -247,13 +295,47 @@ const CreateLeadModal = ({ isOpen, onClose, onSubmit }) => {
                                 <label className="block text-sm font-medium text-gray-600 mb-1">
                                     Company
                                 </label>
+                                <div className="relative">
+                                    <div 
+                                        className="w-full h-10 p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200 flex justify-between items-center cursor-pointer"
+                                        onClick={() => setIsClientDropdownOpen(!isClientDropdownOpen)}
+                                    >
+                                        <span className={selectedClient ? 'text-gray-700' : 'text-gray-400'}>
+                                            {selectedClient ? selectedClient.company : 'Select a client'}
+                                        </span>
+                                        <ChevronDown size={16} className="text-gray-400" />
+                                    </div>
+                                    
+                                    {isClientDropdownOpen && (
+                                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                            {isLoadingClients ? (
+                                                <div className="p-2 text-center text-gray-500">
+                                                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-400 mx-auto"></div>
+                                                </div>
+                                            ) : clients.length > 0 ? (
+                                                clients.map(client => (
+                                                    <div 
+                                                        key={client.client_id}
+                                                        className="p-2 hover:bg-gray-50 cursor-pointer transition-colors duration-150"
+                                                        onClick={() => handleClientSelect(client)}
+                                                    >
+                                                        {client.company}
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <div className="p-2 text-center text-gray-500">
+                                                    No clients found
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                {/* Hidden input to maintain form data */}
                                 <input
-                                    type="text"
+                                    type="hidden"
                                     name="company"
                                     value={formData.company}
-                                    onChange={handleChange}
-                                    className="w-full h-10 p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200"
-                                    placeholder="Enter company name"
                                 />
                             </div>
 
@@ -451,17 +533,56 @@ const EditLeadModal = ({ isOpen, onClose, onSubmit, initialData }) => {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [tagInput, setTagInput] = useState('');
     const { userData, BASE_URL } = useUser();
+    
+    // New state for clients
+    const [clients, setClients] = useState([]);
+    const [isLoadingClients, setIsLoadingClients] = useState(false);
+    const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
+    const [selectedClient, setSelectedClient] = useState(null);
 
     useEffect(() => {
         if (isOpen && initialData) {
             fetchEmployees();
+            fetchClients();
             setFormData({
                 ...initialFormState,
                 ...initialData,
                 assignedToId: initialData.assignedToId || ''
             });
+            // Set selected client if client data exists in initialData
+            if (initialData.client) {
+                setSelectedClient({
+                    client_id: initialData.client.client_id,
+                    company: initialData.client.company,
+                    phone: initialData.client.phone,
+                    notes: initialData.client.notes,
+                    tags: initialData.client.tags
+                });
+            }
         }
     }, [isOpen, initialData]);
+
+    // New function to fetch clients
+    const fetchClients = async () => {
+        try {
+            setIsLoadingClients(true);
+            const response = await axios.post(`${BASE_URL}/clients/get-clients`, {
+                organization_id: userData.organization_id,
+                user_id: userData.user_id
+            });
+
+            if (response.data.success) {
+                setClients(response.data.data);
+            } else {
+                toast.error("Failed to fetch clients");
+            }
+        } catch (error) {
+            console.error("Error fetching clients:", error);
+            toast.error("Failed to fetch clients. Please try again.");
+        } finally {
+            setIsLoadingClients(false);
+        }
+    };
 
     const fetchEmployees = async () => {
         try {
@@ -490,6 +611,18 @@ const EditLeadModal = ({ isOpen, onClose, onSubmit, initialData }) => {
             ...prev,
             [name]: value
         }));
+    };
+
+    const handleClientSelect = (client) => {
+        setSelectedClient(client);
+        setFormData(prev => ({
+            ...prev,
+            company: client.company,
+            phone: client.phone,
+            notes: client.notes || '',
+            tags: client.tags || []
+        }));
+        setIsClientDropdownOpen(false);
     };
 
     const handleEmployeeSelect = (employee) => {
@@ -523,7 +656,6 @@ const EditLeadModal = ({ isOpen, onClose, onSubmit, initialData }) => {
         setIsSubmitting(true);
 
         try {
-            // Create a clean payload
             const payload = {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id,
@@ -538,7 +670,8 @@ const EditLeadModal = ({ isOpen, onClose, onSubmit, initialData }) => {
                 notes: formData.notes,
                 tags: formData.tags,
                 budget: formData.budget ? Number(formData.budget) : undefined,
-                expectedCloseDate: formData.expectedCloseDate
+                expectedCloseDate: formData.expectedCloseDate,
+                client_id: selectedClient?.client_id || null
             };
 
             // Only include assignedTo if it's not empty
@@ -576,252 +709,273 @@ const EditLeadModal = ({ isOpen, onClose, onSubmit, initialData }) => {
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-4 max-h-[80vh] overflow-y-auto">
-                    <div className="grid grid-cols-2 gap-6">
-                        {/* Left Column */}
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-1">
-                                    Name *
-                                </label>
-                                <input
-                                    type="text"
-                                    name="name"
-                                    value={formData.name}
-                                    onChange={handleChange}
-                                    required
-                                    className="w-full h-10 p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200"
-                                    placeholder="Enter lead name"
-                                />
-                            </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">
+                                Name
+                            </label>
+                            <input
+                                type="text"
+                                name="name"
+                                value={formData.name}
+                                onChange={handleChange}
+                                className="w-full p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200"
+                                placeholder="Enter lead name"
+                                required
+                            />
+                        </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-1">
-                                    Email *
-                                </label>
-                                <input
-                                    type="email"
-                                    name="email"
-                                    value={formData.email}
-                                    onChange={handleChange}
-                                    required
-                                    className="w-full h-10 p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200"
-                                    placeholder="Enter email address"
-                                />
-                            </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">
+                                Email
+                            </label>
+                            <input
+                                type="email"
+                                name="email"
+                                value={formData.email}
+                                onChange={handleChange}
+                                className="w-full p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200"
+                                placeholder="Enter email address"
+                                required
+                            />
+                        </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-1">
-                                    Assigned To
-                                </label>
-                                <div className="relative">
-                                    <div 
-                                        className="w-full h-10 p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200 flex justify-between items-center cursor-pointer"
-                                        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                    >
-                                        <span className={formData.assignedTo === 'Unassigned' ? 'text-gray-400' : 'text-gray-700'}>
-                                            {formData.assignedTo}
-                                        </span>
-                                        <ChevronDown size={16} className="text-gray-400" />
-                                    </div>
-                                    
-                                    {isDropdownOpen && (
-                                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                                            <div 
-                                                className="p-2 hover:bg-gray-50 cursor-pointer transition-colors duration-150"
-                                                onClick={() => handleEmployeeSelect({ name: 'Unassigned', user_id: '' })}
-                                            >
-                                                Unassigned
+                        <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">
+                                Phone
+                            </label>
+                            <input
+                                type="tel"
+                                name="phone"
+                                value={formData.phone}
+                                onChange={handleChange}
+                                className="w-full p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200"
+                                placeholder="Enter phone number"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">
+                                Company
+                            </label>
+                            <div className="relative">
+                                <div 
+                                    className="w-full h-10 p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200 flex justify-between items-center cursor-pointer"
+                                    onClick={() => setIsClientDropdownOpen(!isClientDropdownOpen)}
+                                >
+                                    <span className={selectedClient ? 'text-gray-700' : 'text-gray-400'}>
+                                        {selectedClient ? selectedClient.company : 'Select a client'}
+                                    </span>
+                                    <ChevronDown size={16} className="text-gray-400" />
+                                </div>
+                                
+                                {isClientDropdownOpen && (
+                                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                        {isLoadingClients ? (
+                                            <div className="p-2 text-center text-gray-500">
+                                                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-400 mx-auto"></div>
                                             </div>
-                                            {isLoadingEmployees ? (
-                                                <div className="p-2 text-center text-gray-500">
-                                                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-400 mx-auto"></div>
+                                        ) : clients.length > 0 ? (
+                                            clients.map(client => (
+                                                <div 
+                                                    key={client.client_id}
+                                                    className="p-2 hover:bg-gray-50 cursor-pointer transition-colors duration-150"
+                                                    onClick={() => handleClientSelect(client)}
+                                                >
+                                                    {client.company}
                                                 </div>
-                                            ) : employees.length > 0 ? (
-                                                employees.map(employee => (
-                                                    <div 
-                                                        key={employee.user_id}
-                                                        className="p-2 hover:bg-gray-50 cursor-pointer transition-colors duration-150"
-                                                        onClick={() => handleEmployeeSelect(employee)}
-                                                    >
-                                                        {employee.name}
-                                                    </div>
-                                                ))
-                                            ) : (
-                                                <div className="p-2 text-center text-gray-500">
-                                                    No employees found
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="p-2 text-center text-gray-500">
+                                                No clients found
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-1">
-                                    Phone
-                                </label>
-                                <input
-                                    type="tel"
-                                    name="phone"
-                                    value={formData.phone}
-                                    onChange={handleChange}
-                                    className="w-full h-10 p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200"
-                                    placeholder="Enter phone number"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-1">
-                                    Company
-                                </label>
-                                <input
-                                    type="text"
-                                    name="company"
-                                    value={formData.company}
-                                    onChange={handleChange}
-                                    className="w-full h-10 p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200"
-                                    placeholder="Enter company name"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-1">
-                                    Source
-                                </label>
-                                <input
-                                    type="text"
-                                    name="source"
-                                    value={formData.source}
-                                    onChange={handleChange}
-                                    className="w-full h-10 p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200"
-                                    placeholder="e.g., website, referral, etc."
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-1">
-                                    Status
-                                </label>
-                                <select
-                                    name="status"
-                                    value={formData.status}
-                                    onChange={handleChange}
-                                    className="w-full h-10 p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200"
-                                >
-                                    <option value="New">New</option>
-                                    <option value="Contacted">Contacted</option>
-                                    <option value="Qualified">Qualified</option>
-                                    <option value="Lost">Lost</option>
-                                </select>
-                            </div>
-
-                           
+                            
+                            {/* Hidden input to maintain form data */}
+                            <input
+                                type="hidden"
+                                name="company"
+                                value={formData.company}
+                            />
                         </div>
 
-                        {/* Right Column */}
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-1">
-                                    Notes
-                                </label>
-                                <textarea
-                                    name="notes"
-                                    value={formData.notes}
-                                    onChange={handleChange}
-                                    rows="3"
-                                    className="w-full h-[120px] p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200"
-                                    placeholder="Enter any notes about the lead"
-                                ></textarea>
-                            </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">
+                                Source
+                            </label>
+                            <input
+                                type="text"
+                                name="source"
+                                value={formData.source}
+                                onChange={handleChange}
+                                className="w-full p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200"
+                                placeholder="Enter source"
+                            />
+                        </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-1">
-                                    Tags
-                                </label>
-                                <div className="flex flex-wrap gap-2 mb-2 h-[25px]">
-                                    {formData.tags.map((tag, index) => (
-                                        <span 
-                                            key={index} 
-                                            className="bg-blue-100 text-blue-800 px-2 py-1 rounded-md text-sm flex items-center gap-1"
-                                        >
-                                            {tag}
-                                            <button 
-                                                type="button" 
-                                                onClick={() => handleRemoveTag(tag)}
-                                                className="text-blue-600 hover:text-blue-800"
-                                            >
-                                                <X size={14} />
-                                            </button>
-                                        </span>
-                                    ))}
-                                </div>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={tagInput}
-                                        onChange={(e) => setTagInput(e.target.value)}
-                                        onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
-                                        className="flex-1 h-10 p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200"
-                                        placeholder="Add a tag and press Enter"
-                                    />
-                                    <button 
-                                        type="button" 
-                                        onClick={handleAddTag}
-                                        className="px-3 py-2 bg-blue-400 text-white rounded-md hover:bg-blue-500 transition-colors duration-200"
+                        <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">
+                                Status
+                            </label>
+                            <select
+                                name="status"
+                                value={formData.status}
+                                onChange={handleChange}
+                                className="w-full p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200"
+                            >
+                                <option value="New">New</option>
+                                <option value="Contacted">Contacted</option>
+                                <option value="Qualified">Qualified</option>
+                                <option value="Lost">Lost</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">
+                                Priority
+                            </label>
+                            <select
+                                name="priority"
+                                value={formData.priority}
+                                onChange={handleChange}
+                                className="w-full p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200"
+                            >
+                                <option value="low">Low</option>
+                                <option value="medium">Medium</option>
+                                <option value="high">High</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">
+                                Notes
+                            </label>
+                            <textarea
+                                name="notes"
+                                value={formData.notes}
+                                onChange={handleChange}
+                                rows="3"
+                                className="w-full p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200"
+                                placeholder="Enter any notes about the lead"
+                            ></textarea>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">
+                                Tags
+                            </label>
+                            <div className="flex flex-wrap gap-2 mb-2 h-[25px]">
+                                {formData.tags.map((tag, index) => (
+                                    <span 
+                                        key={index} 
+                                        className="bg-blue-100 text-blue-800 px-2 py-1 rounded-md text-sm flex items-center gap-1"
                                     >
-                                        Add
-                                    </button>
-                                </div>
+                                        {tag}
+                                        <button 
+                                            type="button" 
+                                            onClick={() => handleRemoveTag(tag)}
+                                            className="text-blue-600 hover:text-blue-800"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </span>
+                                ))}
                             </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-1">
-                                    Budget
-                                </label>
+                            <div className="flex gap-2">
                                 <input
-                                    type="number"
-                                    name="budget"
-                                    value={formData.budget}
-                                    onChange={handleChange}
-                                    className="w-full h-10 p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200"
-                                    placeholder="Enter budget amount"
+                                    type="text"
+                                    value={tagInput}
+                                    onChange={(e) => setTagInput(e.target.value)}
+                                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
+                                    className="flex-1 h-10 p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200"
+                                    placeholder="Add a tag and press Enter"
                                 />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-1">
-                                    Expected Close Date
-                                </label>
-                                <input
-                                    type="date"
-                                    name="expectedCloseDate"
-                                    value={formData.expectedCloseDate}
-                                    onChange={handleChange}
-                                    className="w-full h-10 p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200"
-                                />
-                            </div>
-
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-1">
-                                    Priority
-                                </label>
-                                <select
-                                    name="priority"
-                                    value={formData.priority}
-                                    onChange={handleChange}
-                                    className="w-full h-10 p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200"
+                                <button 
+                                    type="button" 
+                                    onClick={handleAddTag}
+                                    className="px-3 py-2 bg-blue-400 text-white rounded-md hover:bg-blue-500 transition-colors duration-200"
                                 >
-                                    <option value="low">Low</option>
-                                    <option value="medium">Medium</option>
-                                    <option value="high">High</option>
-                                </select>
+                                    Add
+                                </button>
                             </div>
-
-
                         </div>
 
-                      
+                        <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">
+                                Budget
+                            </label>
+                            <input
+                                type="number"
+                                name="budget"
+                                value={formData.budget}
+                                onChange={handleChange}
+                                className="w-full p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200"
+                                placeholder="Enter budget amount"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">
+                                Expected Close Date
+                            </label>
+                            <input
+                                type="date"
+                                name="expectedCloseDate"
+                                value={formData.expectedCloseDate}
+                                onChange={handleChange}
+                                className="w-full p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">
+                                Assigned To
+                            </label>
+                            <div className="relative">
+                                <div 
+                                    className="w-full h-10 p-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200 flex justify-between items-center cursor-pointer"
+                                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                                >
+                                    <span className={formData.assignedTo === 'Unassigned' ? 'text-gray-400' : 'text-gray-700'}>
+                                        {formData.assignedTo}
+                                    </span>
+                                    <ChevronDown size={16} className="text-gray-400" />
+                                </div>
+                                
+                                {isDropdownOpen && (
+                                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                        <div 
+                                            className="p-2 hover:bg-gray-50 cursor-pointer transition-colors duration-150"
+                                            onClick={() => handleEmployeeSelect({ name: 'Unassigned', user_id: '' })}
+                                        >
+                                            Unassigned
+                                        </div>
+                                        {isLoadingEmployees ? (
+                                            <div className="p-2 text-center text-gray-500">
+                                                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-400 mx-auto"></div>
+                                            </div>
+                                        ) : employees.length > 0 ? (
+                                            employees.map(employee => (
+                                                <div 
+                                                    key={employee.user_id}
+                                                    className="p-2 hover:bg-gray-50 cursor-pointer transition-colors duration-150"
+                                                    onClick={() => handleEmployeeSelect(employee)}
+                                                >
+                                                    {employee.name}
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="p-2 text-center text-gray-500">
+                                                No employees found
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
 
                     <div className="flex justify-end gap-2 pt-6 mt-6 border-t border-gray-100">
@@ -1240,10 +1394,28 @@ const Leads = () => {
         setLeads(prev => [...prev, newLead]);
     };
 
-    const handleUpdateLead = (updatedLead) => {
-        setLeads(prev => prev.map(lead => 
-            lead.lead_id === updatedLead.lead_id ? updatedLead : lead
-        ));
+    const handleUpdateLead = async (updatedLead) => {
+        try {
+            // Fetch all leads to get the fresh data
+            const response = await axios.post(`${BASE_URL}/leads/get-leads`, {
+                organization_id: userData.organization_id,
+                user_id: userData.user_id
+            });
+
+            if (response.data.success) {
+                // Update the leads list with all the fresh data
+                setLeads(response.data.data || []);
+                // Unselect the lead after successful update
+                setSelectedLeads([]);
+                setSelectedLead(null);
+                setIsEditModalOpen(false);
+            } else {
+                toast.error("Failed to fetch updated leads data");
+            }
+        } catch (error) {
+            console.error("Error fetching updated leads:", error);
+            toast.error("Failed to fetch updated leads data. Please refresh the page.");
+        }
     };
 
     const handleConvertToPipeline = async () => {
@@ -1416,7 +1588,7 @@ const Leads = () => {
                                                 </div>
                                             </button>
                                         )}
-                                        {selectedLeads.length >= 1 && (
+                                        {selectedLeads.length == 1 && (
                                             <button 
                                                 onClick={handleConvertToPipeline}
                                                 disabled={isConverting}
@@ -1522,7 +1694,7 @@ const Leads = () => {
                                                     <td className="w-[150px] xl:w-[250px] px-6 py-4 whitespace-nowrap">
                                                         {(() => {
                                                             const filter = filters.find(f => f.field === 'priority');
-                                                            const val = lead.priority.charAt(0).toUpperCase() + lead.priority.slice(1);
+                                                            const val = lead.priority ? lead.priority.charAt(0).toUpperCase() + lead.priority.slice(1) : '-';
                                                             return filter ? (
                                                                 <span className={`px-2 py-1 text-xs rounded-full ${
                                                                     lead.priority === 'high' ? 'bg-red-50 text-red-600' :

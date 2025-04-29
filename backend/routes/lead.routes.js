@@ -3,6 +3,7 @@ import { Lead } from '../models/lead.model.js';
 import { Deal } from '../models/deal.model.js';
 import { Organization } from '../models/organization.model.js';
 import { User } from '../models/user.model.js';
+import { Client } from '../models/client.model.js';
 
 const router = express.Router();
 
@@ -25,7 +26,8 @@ router.post('/get-leads', async (req, res) => {
         const leads = await Lead.find({ organization: organization._id })
             .populate('assignedTo', 'name')
             .populate('createdBy', 'name')
-            .populate('updatedBy', 'name');
+            .populate('updatedBy', 'name')
+            .populate('client', 'client_id company phone notes tags');
 
         res.json({
             success: true,
@@ -43,6 +45,14 @@ router.post('/get-leads', async (req, res) => {
                 budget: lead.budget || 0,
                 expectedCloseDate: lead.expectedCloseDate || null,
                 assignedTo: lead.assignedTo?.name || 'Unassigned',
+                client_id: lead.client?.client_id || null,
+                client: lead.client ? {
+                    client_id: lead.client.client_id,
+                    company: lead.client.company,
+                    phone: lead.client.phone,
+                    notes: lead.client.notes,
+                    tags: lead.client.tags
+                } : null,
                 createdAt: lead.createdAt,
                 updatedAt: lead.updatedAt
             }))
@@ -58,7 +68,7 @@ router.post('/get-leads', async (req, res) => {
 // Create a new lead
 router.post('/create-lead', async (req, res) => {
     try {
-        const { organization_id, user_id, assignedTo, ...leadData } = req.body;
+        const { organization_id, user_id, assignedTo, client_id, ...leadData } = req.body;
         
         // Find organization by org_id
         const organization = await Organization.findOne({ org_id: organization_id });
@@ -90,12 +100,26 @@ router.post('/create-lead', async (req, res) => {
             }
         }
 
+        // Find client if client_id is provided
+        let client = null;
+        if (client_id) {
+            client = await Client.findOne({ client_id });
+            if (!client) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Client not found'
+                });
+            }
+        }
+
         const lead = new Lead({
             ...leadData,
             organization: organization._id,
             createdBy: user._id,
             updatedBy: user._id,
-            assignedTo: assignedToUser ? assignedToUser._id : null
+            assignedTo: assignedToUser ? assignedToUser._id : null,
+            client: client ? client._id : null,
+            client_id: client_id
         });
 
         await lead.save();
@@ -104,7 +128,8 @@ router.post('/create-lead', async (req, res) => {
         const populatedLead = await Lead.findById(lead._id)
             .populate('assignedTo', 'name')
             .populate('createdBy', 'name')
-            .populate('updatedBy', 'name');
+            .populate('updatedBy', 'name')
+            .populate('client', 'client_id company phone notes tags');
 
         res.json({
             success: true,
@@ -122,6 +147,14 @@ router.post('/create-lead', async (req, res) => {
                 budget: populatedLead.budget || 0,
                 expectedCloseDate: populatedLead.expectedCloseDate || null,
                 assignedTo: populatedLead.assignedTo?.name || 'Unassigned',
+                client_id: populatedLead.client?.client_id || null,
+                client: populatedLead.client ? {
+                    client_id: populatedLead.client.client_id,
+                    company: populatedLead.client.company,
+                    phone: populatedLead.client.phone,
+                    notes: populatedLead.client.notes,
+                    tags: populatedLead.client.tags
+                } : null,
                 createdAt: populatedLead.createdAt,
                 updatedAt: populatedLead.updatedAt
             }
@@ -137,7 +170,7 @@ router.post('/create-lead', async (req, res) => {
 // Update a lead
 router.post('/update-lead', async (req, res) => {
     try {
-        const { organization_id, user_id, lead_id, ...updateData } = req.body;
+        const { organization_id, user_id, lead_id, client_id, ...updateData } = req.body;
         
         // Find organization by org_id
         const organization = await Organization.findOne({ org_id: organization_id });
@@ -157,17 +190,32 @@ router.post('/update-lead', async (req, res) => {
             });
         }
 
+        // Find client if client_id is provided
+        let client = null;
+        if (client_id) {
+            client = await Client.findOne({ client_id });
+            if (!client) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Client not found'
+                });
+            }
+        }
+
         const lead = await Lead.findOneAndUpdate(
             { lead_id, organization: organization._id },
             { 
                 ...updateData,
-                updatedBy: user._id
+                updatedBy: user._id,
+                client: client ? client._id : null,
+                client_id: client_id
             },
             { new: true }
         )
         .populate('assignedTo', 'name')
         .populate('createdBy', 'name')
-        .populate('updatedBy', 'name');
+        .populate('updatedBy', 'name')
+        .populate('client', 'client_id company phone notes tags');
 
         if (!lead) {
             return res.status(404).json({
@@ -192,6 +240,14 @@ router.post('/update-lead', async (req, res) => {
                 budget: lead.budget || 0,
                 expectedCloseDate: lead.expectedCloseDate || null,
                 assignedTo: lead.assignedTo?.name || 'Unassigned',
+                client_id: lead.client?.client_id || null,
+                client: lead.client ? {
+                    client_id: lead.client.client_id,
+                    company: lead.client.company,
+                    phone: lead.client.phone,
+                    notes: lead.client.notes,
+                    tags: lead.client.tags
+                } : null,
                 createdAt: lead.createdAt,
                 updatedAt: lead.updatedAt
             }
