@@ -1,13 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
 import Card from '../../components/ui/Card';
 import { Plus, Calendar, Users, Clock, MoreVertical, X, AlertTriangle, Edit2, Trash2, Search } from 'lucide-react';
-import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend, Tooltip, ComposedChart, CartesianGrid, XAxis, YAxis, Bar, Line, Scatter } from 'recharts';
+// Update the imports to remove TreeMap
+import {
+    ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+    Radar, Legend, Tooltip, ComposedChart, CartesianGrid, XAxis, YAxis, Bar,
+    Line, Scatter, AreaChart, Area, PieChart, Pie, Cell,
+    LineChart, BarChart
+} from 'recharts';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 import { useUser } from '../../context/UserContext';
 import { toast } from 'react-hot-toast';
 
 const BASE_URL = 'http://localhost:5000/api';
+
+
 
 // Employee Search Component
 const EmployeeSearch = ({ onSelectEmployee, selectedEmployees }) => {
@@ -205,10 +213,10 @@ const Projects = () => {
                 project_dueDate: newProject.deadline,
                 project_team: newProject.team
             };
-            
+
             console.log('Sending project payload:', projectPayload);
             const response = await axios.post(`${BASE_URL}/projects/create-project`, projectPayload);
-            
+
             if (response.data.success) {
                 setProjects(prev => [...prev, response.data.data]);
                 toast.success("Project created successfully");
@@ -303,6 +311,83 @@ const Projects = () => {
         });
     };
 
+    const getProjectHealthMetrics = () => {
+        return projects.map(project => {
+            const totalTasks = project.tasks?.length || 0;
+            const completedTasks = project.tasks?.filter(t => t.status === 'Completed').length || 0;
+            const onTrack = project.deadline ? new Date(project.deadline) > new Date() : true;
+            const teamSize = project.team?.length || 0;
+
+            return {
+                name: project.name,
+                completionRate: totalTasks ? (completedTasks / totalTasks) * 100 : 0,
+                onSchedule: onTrack ? 100 : 50,
+                teamEfficiency: Math.min((completedTasks / (teamSize || 1)) * 20, 100),
+                riskScore: project.priority === 'High' ? 80 : project.priority === 'Medium' ? 50 : 30
+            };
+        });
+    };
+
+    const getTaskDistribution = () => {
+        const distribution = {
+            'Not Started': 0,
+            'In Progress': 0,
+            'Completed': 0,
+            'On Hold': 0
+        };
+
+        projects.forEach(project => {
+            (project.tasks || []).forEach(task => {
+                distribution[task.status] = (distribution[task.status] || 0) + 1;
+            });
+        });
+
+        return Object.entries(distribution).map(([status, count]) => ({
+            name: status,
+            value: count
+        }));
+    };
+
+    const getTeamWorkload = () => {
+        const workload = {};
+
+        projects.forEach(project => {
+            (project.team || []).forEach(member => {
+                if (!workload[member]) {
+                    workload[member] = {
+                        name: member,
+                        totalTasks: 0,
+                        completedTasks: 0,
+                        projects: 1
+                    };
+                } else {
+                    workload[member].projects += 1;
+                }
+
+                // Count tasks assigned to this member
+                (project.tasks || []).forEach(task => {
+                    if (task.assignee === member) {
+                        workload[member].totalTasks += 1;
+                        if (task.status === 'Completed') {
+                            workload[member].completedTasks += 1;
+                        }
+                    }
+                });
+            });
+        });
+
+        return Object.values(workload);
+    };
+
+    const getProjectTimeline = () => {
+        return projects.map(project => ({
+            name: project.name,
+            start: new Date(project.createdAt || Date.now()).getTime(),
+            end: new Date(project.deadline || Date.now()).getTime(),
+            completion: project.progress || 0
+        })).sort((a, b) => a.start - b.start);
+    };
+
     const handleDeleteClick = (project) => {
         setDeleteProject(project);
     };
@@ -389,7 +474,7 @@ const Projects = () => {
 
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {projects.map((project,index) => (
+                {projects.map((project, index) => (
                     <Card key={project.project_id} className="p-6">
                         <div className="flex justify-between items-start mb-4">
                             <div>
@@ -446,13 +531,13 @@ const Projects = () => {
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
                                 <span className={`px-2 py-1 text-xs rounded-full ${project.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                                        project.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                                            'bg-yellow-100 text-yellow-800'
+                                    project.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
+                                        'bg-yellow-100 text-yellow-800'
                                     }`}>
                                     {project.status}
                                 </span>
                                 <span className={`px-2 py-1 text-xs rounded-full ${project.priority === 'High' ? 'bg-red-100 text-red-800' :
-                                        'bg-orange-100 text-orange-800'
+                                    'bg-orange-100 text-orange-800'
                                     }`}>
                                     {project.priority}
                                 </span>
@@ -485,7 +570,7 @@ const Projects = () => {
                 ))}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 mt-[50px]">
                 {/* Project Performance Radar Chart */}
                 <Card className="p-6">
                     <h2 className="text-lg font-semibold mb-4">Project Performance Matrix</h2>
@@ -560,6 +645,114 @@ const Projects = () => {
                 </Card>
             </div>
 
+            {/* Add this new grid of charts after your existing charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                {/* Project Health Dashboard */}
+                <Card className="p-6">
+                    <h2 className="text-lg font-semibold mb-4">Project Health Dashboard</h2>
+                    <div className="h-[400px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={getProjectHealthMetrics()}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
+                                <YAxis />
+                                <Tooltip />
+                                <Legend />
+                                <Bar dataKey="completionRate" name="Completion Rate" fill="#4CAF50" />
+                                <Bar dataKey="onSchedule" name="Schedule Performance" fill="#2196F3" />
+                                <Bar dataKey="teamEfficiency" name="Team Efficiency" fill="#FF9800" />
+                                <Bar dataKey="riskScore" name="Risk Level" fill="#f44336" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </Card>
+
+                {/* Task Status Distribution */}
+                <Card className="p-6">
+                    <h2 className="text-lg font-semibold mb-4">Task Status Distribution</h2>
+                    <div className="h-[400px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={getTaskDistribution()}
+                                    dataKey="value"
+                                    nameKey="name"
+                                    cx="50%"
+                                    cy="50%"
+                                    outerRadius={150}
+                                    label
+                                >
+                                    {getTaskDistribution().map((entry, index) => (
+                                        <Cell
+                                            key={`cell-${index}`}
+                                            fill={[
+                                                '#FF9800', // Not Started
+                                                '#2196F3', // In Progress
+                                                '#4CAF50', // Completed
+                                                '#9E9E9E'  // On Hold
+                                            ][index % 4]}
+                                        />
+                                    ))}
+                                </Pie>
+                                <Tooltip />
+                                <Legend />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                </Card>
+
+                {/* Team Workload Analysis */}
+                <Card className="p-6">
+                    <h2 className="text-lg font-semibold mb-4">Team Workload Analysis</h2>
+                    <div className="h-[400px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <ComposedChart data={getTeamWorkload()}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
+                                <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
+                                <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" />
+                                <Tooltip />
+                                <Legend />
+                                <Bar yAxisId="left" dataKey="totalTasks" name="Total Tasks" fill="#8884d8" />
+                                <Bar yAxisId="left" dataKey="completedTasks" name="Completed Tasks" fill="#82ca9d" />
+                                <Line yAxisId="right" type="monotone" dataKey="projects" name="Projects Involved" stroke="#ff7300" />
+                            </ComposedChart>
+                        </ResponsiveContainer>
+                    </div>
+                </Card>
+
+                {/* Project Timeline Overview */}
+                <Card className="p-6">
+                    <h2 className="text-lg font-semibold mb-4">Project Timeline Overview</h2>
+                    <div className="h-[400px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={getProjectTimeline()}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis
+                                    dataKey="name"
+                                    angle={-45}
+                                    textAnchor="end"
+                                    height={80}
+                                />
+                                <YAxis />
+                                <Tooltip
+                                    labelFormatter={(value) => `Project: ${value}`}
+                                    formatter={(value) => [`${value}%`, 'Completion']}
+                                />
+                                <Legend />
+                                <Area
+                                    type="monotone"
+                                    dataKey="completion"
+                                    stroke="#8884d8"
+                                    fill="#8884d8"
+                                    name="Project Progress"
+                                />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </Card>
+            </div>
+
 
 
             {isModalOpen && !selectedProject && (
@@ -619,7 +812,7 @@ const AddProjectModal = ({ isOpen, onClose, onSubmit, selectedTeamMembers, setSe
         priority: 'Medium',
         tasks: [],
         progress: 0,
-        project_id:""
+        project_id: ""
     };
 
     const [formData, setFormData] = useState(initialFormState);
@@ -1048,13 +1241,13 @@ const AddProjectModal = ({ isOpen, onClose, onSubmit, selectedTeamMembers, setSe
                                                 <p className="text-sm text-gray-500">{task.description}</p>
                                                 <div className="flex items-center gap-2 mt-1">
                                                     <span className={`px-2 py-1 text-xs rounded-full ${task.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                                                            task.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                                                                'bg-yellow-100 text-yellow-800'
+                                                        task.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
+                                                            'bg-yellow-100 text-yellow-800'
                                                         }`}>
                                                         {task.status}
                                                     </span>
                                                     <span className={`px-2 py-1 text-xs rounded-full ${task.priority === 'High' ? 'bg-red-100 text-red-800' :
-                                                            'bg-orange-100 text-orange-800'
+                                                        'bg-orange-100 text-orange-800'
                                                         }`}>
                                                         {task.priority}
                                                     </span>
@@ -1152,7 +1345,7 @@ const EditProjectModal = ({ isOpen, onClose, onSubmit, project }) => {
                     // If t is a string, find the employee by user_id or name
                     : employees.find(emp => emp.user_id === t || emp.name === t)
             ).filter(Boolean); // Remove any undefined
-    
+
             setFormData({
                 name: project.name || '',
                 description: project.description || '',
@@ -1590,13 +1783,13 @@ const EditProjectModal = ({ isOpen, onClose, onSubmit, project }) => {
                                                 <p className="text-sm text-gray-500">{task.description}</p>
                                                 <div className="flex items-center gap-2 mt-1">
                                                     <span className={`px-2 py-1 text-xs rounded-full ${task.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                                                            task.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                                                                'bg-yellow-100 text-yellow-800'
+                                                        task.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
+                                                            'bg-yellow-100 text-yellow-800'
                                                         }`}>
                                                         {task.status}
                                                     </span>
                                                     <span className={`px-2 py-1 text-xs rounded-full ${task.priority === 'High' ? 'bg-red-100 text-red-800' :
-                                                            'bg-orange-100 text-orange-800'
+                                                        'bg-orange-100 text-orange-800'
                                                         }`}>
                                                         {task.priority}
                                                     </span>
@@ -1684,13 +1877,13 @@ const DeleteProjectModal = ({ isOpen, onClose, project, onProceed }) => {
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className={`px-2 py-1 text-xs rounded-full ${project?.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                                        project?.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                                            'bg-yellow-100 text-yellow-800'
+                                    project?.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
+                                        'bg-yellow-100 text-yellow-800'
                                     }`}>
                                     {project?.status}
                                 </span>
                                 <span className={`px-2 py-1 text-xs rounded-full ${project?.priority === 'High' ? 'bg-red-100 text-red-800' :
-                                        'bg-orange-100 text-orange-800'
+                                    'bg-orange-100 text-orange-800'
                                     }`}>
                                     {project?.priority}
                                 </span>

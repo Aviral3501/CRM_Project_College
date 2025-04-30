@@ -5,6 +5,172 @@ import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { useUser } from '../../context/UserContext';
 import toast from 'react-hot-toast';
+import { 
+    ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, 
+    XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+    RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
+    LineChart, Line, AreaChart, Area
+} from 'recharts';
+
+const AnalyticsSection = ({ employees }) => {
+    // Data preparation functions
+    const getDepartmentDistribution = () => {
+        const deptCount = employees.reduce((acc, emp) => {
+            acc[emp.department] = (acc[emp.department] || 0) + 1;
+            return acc;
+        }, {});
+        
+        return Object.entries(deptCount).map(([name, value]) => ({ name, value }));
+    };
+
+    const getStatusMetrics = () => {
+        const statusCount = employees.reduce((acc, emp) => {
+            acc[emp.status] = (acc[emp.status] || 0) + 1;
+            return acc;
+        }, {});
+        
+        return Object.entries(statusCount).map(([name, value]) => ({ name, value }));
+    };
+
+    const getLocationDistribution = () => {
+        const locationCount = employees.reduce((acc, emp) => {
+            acc[emp.location] = (acc[emp.location] || 0) + 1;
+            return acc;
+        }, {});
+        
+        return Object.entries(locationCount).map(([name, count]) => ({ 
+            name, 
+            count 
+        }));
+    };
+
+    const getDepartmentPerformance = () => {
+        const deptMetrics = employees.reduce((acc, emp) => {
+            if (!acc[emp.department]) {
+                acc[emp.department] = {
+                    name: emp.department,
+                    employeeCount: 0,
+                    activeRate: 0,
+                    seniorityScore: 0
+                };
+            }
+            acc[emp.department].employeeCount++;
+            acc[emp.department].activeRate += emp.status === 'active' ? 1 : 0;
+            acc[emp.department].seniorityScore += emp.title.toLowerCase().includes('senior') ? 1 : 0;
+            return acc;
+        }, {});
+
+        return Object.values(deptMetrics).map(dept => ({
+            ...dept,
+            activeRate: (dept.activeRate / dept.employeeCount) * 100,
+            seniorityScore: (dept.seniorityScore / dept.employeeCount) * 100
+        }));
+    };
+
+    const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="mt-12"
+        >
+            <h2 className="text-2xl font-bold mb-8">Employee Analytics Dashboard</h2>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Department Distribution Chart */}
+                <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    className="bg-white p-6 rounded-xl shadow-lg"
+                >
+                    <h3 className="text-lg font-semibold mb-4">Department Distribution</h3>
+                    <div className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={getDepartmentDistribution()}
+                                    cx="50%"
+                                    cy="50%"
+                                    labelLine={false}
+                                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                                    outerRadius={100}
+                                    fill="#8884d8"
+                                    dataKey="value"
+                                >
+                                    {getDepartmentDistribution().map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    ))}
+                                </Pie>
+                                <Tooltip />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                </motion.div>
+
+                {/* Employee Status Chart */}
+                <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    className="bg-white p-6 rounded-xl shadow-lg"
+                >
+                    <h3 className="text-lg font-semibold mb-4">Employee Status Overview</h3>
+                    <div className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={getStatusMetrics()}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="name" />
+                                <YAxis />
+                                <Tooltip />
+                                <Legend />
+                                <Bar dataKey="value" fill="#82ca9d" name="Employee Count" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </motion.div>
+
+                {/* Department Performance Radar */}
+                <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    className="bg-white p-6 rounded-xl shadow-lg"
+                >
+                    <h3 className="text-lg font-semibold mb-4">Department Performance Metrics</h3>
+                    <div className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <RadarChart outerRadius={90} data={getDepartmentPerformance()}>
+                                <PolarGrid />
+                                <PolarAngleAxis dataKey="name" />
+                                <PolarRadiusAxis angle={30} domain={[0, 100]} />
+                                <Radar name="Active Rate" dataKey="activeRate" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
+                                <Radar name="Seniority Score" dataKey="seniorityScore" stroke="#82ca9d" fill="#82ca9d" fillOpacity={0.6} />
+                                <Legend />
+                                <Tooltip />
+                            </RadarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </motion.div>
+
+                {/* Geographical Distribution */}
+                <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    className="bg-white p-6 rounded-xl shadow-lg"
+                >
+                    <h3 className="text-lg font-semibold mb-4">Geographical Distribution</h3>
+                    <div className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={getLocationDistribution()}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="name" />
+                                <YAxis />
+                                <Tooltip />
+                                <Area type="monotone" dataKey="count" stroke="#8884d8" fill="#8884d8" />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </motion.div>
+            </div>
+        </motion.div>
+    );
+};
 
 const AddEmployeeModal = ({ isOpen, onClose, onAdd }) => {
     const [newEmployee, setNewEmployee] = useState({
@@ -739,6 +905,11 @@ const Employees = () => {
                         </Card>
                     ))}
                 </div>
+            )}
+
+                        {/* Add Analytics Section */}
+                        {!isLoading && employees.length > 0 && (
+                <AnalyticsSection employees={employees} />
             )}
 
             <AddEmployeeModal
