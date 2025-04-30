@@ -14,6 +14,7 @@ import employeeRoutes from "./routes/employee.routes.js";
 import leadRoutes from "./routes/lead.routes.js";
 import clientRoutes from "./routes/client.routes.js";
 import pipelineRoutes from "./routes/pipeline.routes.js";
+import quoteRoutes from "./routes/quote.routes.js";
 
 dotenv.config();
 
@@ -47,6 +48,7 @@ app.use("/api/employees", employeeRoutes);
 app.use("/api/leads", leadRoutes);
 app.use("/api/clients", clientRoutes);
 app.use("/api/pipeline", pipelineRoutes);
+app.use("/api/quotes", quoteRoutes);
 
 
 if (process.env.NODE_ENV === "production") {

@@ -260,7 +260,7 @@ router.post('/update-pipeline', validateIds, async (req, res) => {
             { new: true }
         )
         .populate('lead', 'name email company')
-        .populate('client', 'client_id name email company')  // Include client_id in population
+        .populate('client', 'client_id name email company')
         .populate('assignedTo', 'name user_id')
         .populate('createdBy', 'name')
         .populate('updatedBy', 'name');
@@ -272,17 +272,18 @@ router.post('/update-pipeline', validateIds, async (req, res) => {
             });
         }
 
-        // Check if the pipeline deal has reached the final stage (Negotiation)
-        if (pipeline.stage === "Negotiation") {
+        // Create quote if pipeline is marked as won or lost
+        if (pipeline.stage === "Closed Won" || pipeline.stage === "Closed Lost") {
             // Check if a quote already exists for this pipeline
             const existingQuote = await Quote.findOne({ pipeline: pipeline._id });
             
+            let quote = existingQuote;
             if (!existingQuote) {
                 // Create a new quote
-                const quote = new Quote({
+                quote = new Quote({
                     title: `Quote for ${pipeline.title}`,
                     amount: pipeline.amount,
-                    status: "Pending",
+                    status: pipeline.stage === "Closed Won" ? "Accepted" : "Declined",
                     pipeline: pipeline._id,
                     client: pipeline.client,
                     assignedTo: pipeline.assignedTo,
@@ -290,47 +291,26 @@ router.post('/update-pipeline', validateIds, async (req, res) => {
                     createdBy: user._id,
                     updatedBy: user._id,
                     validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-                    items: pipeline.products.map(product => ({
+                    items: pipeline.products?.map(product => ({
                         name: product.name,
                         quantity: product.quantity,
                         price: product.price,
                         total: product.quantity * product.price
-                    })),
-                    total: pipeline.amount
+                    })) || [],
+                    total: pipeline.amount,
+                    notes: pipeline.notes || ''
                 });
 
                 await quote.save();
             }
+
+            // Include quote_id in the response
+            responseData.quote_id = quote.quote_id;
         }
 
         res.json({
             success: true,
-            data: {
-                pipeline_id: pipeline.pipeline_id,
-                title: pipeline.title,
-                amount: pipeline.amount,
-                stage: pipeline.stage,
-                lead: pipeline.lead ? {
-                    name: pipeline.lead.name,
-                    email: pipeline.lead.email,
-                    company: pipeline.lead.company
-                } : null,
-                client: pipeline.client ? {
-                    client_id: pipeline.client.client_id,  // Include client_id in response
-                    name: pipeline.client.name,
-                    email: pipeline.client.email,
-                    company: pipeline.client.company
-                } : null,
-                client_id: pipeline.client?.client_id || null,  // Include client_id at top level
-                assignedTo: pipeline.assignedTo?.name || 'Unassigned',
-                assignedToId: pipeline.assignedTo?.user_id || null,
-                expectedCloseDate: pipeline.expectedCloseDate,
-                notes: pipeline.notes,
-                probability: pipeline.probability,
-                products: pipeline.products,
-                createdAt: pipeline.createdAt,
-                updatedAt: pipeline.updatedAt
-            }
+            data: responseData
         });
     } catch (error) {
         res.status(500).json({

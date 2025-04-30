@@ -4,6 +4,7 @@ import { Organization } from '../models/organization.model.js';
 import { User } from '../models/user.model.js';
 import { Pipeline } from '../models/pipeline.model.js';
 import { Customer } from '../models/customer.model.js';
+import { Client } from '../models/client.model.js';
 import { protectRoute } from '../middleware/protectRoute.js';
 
 const router = express.Router();
@@ -99,6 +100,14 @@ router.post('/get-quotes', validateIds, async (req, res) => {
                 discount: quote.discount,
                 tax: quote.tax,
                 total: quote.total,
+                clientInfo: quote.clientInfo,
+                billingInfo: quote.billingInfo,
+                currency: quote.currency,
+                paymentDueDate: quote.paymentDueDate,
+                shippingAddress: quote.shippingAddress,
+                shippingMethod: quote.shippingMethod,
+                shippingCost: quote.shippingCost,
+                shippingNotes: quote.shippingNotes,
                 createdAt: quote.createdAt,
                 updatedAt: quote.updatedAt
             }))
@@ -114,7 +123,31 @@ router.post('/get-quotes', validateIds, async (req, res) => {
 // Create a new quote
 router.post('/create-quote', validateIds, async (req, res) => {
     try {
-        const { organization_id, user_id, pipeline_id, assignedTo, ...quoteData } = req.body;
+        const { 
+            organization_id, 
+            user_id, 
+            pipeline_id, 
+            assignedTo, 
+            title,
+            client_id,
+            validUntil,
+            status,
+            items,
+            notes,
+            terms,
+            discount,
+            tax,
+            total,
+            amount,
+            clientInfo,
+            billingInfo,
+            currency,
+            paymentDueDate,
+            shippingAddress,
+            shippingMethod,
+            shippingCost,
+            shippingNotes
+        } = req.body;
         
         // Find organization by org_id
         const organization = await Organization.findOne({ org_id: organization_id });
@@ -158,14 +191,59 @@ router.post('/create-quote', validateIds, async (req, res) => {
             }
         }
 
+        // Find client if provided
+        let client = null;
+        if (client_id) {
+            client = await Client.findOne({ client_id });
+            if (!client) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Client not found'
+                });
+            }
+        }
+
+        // Calculate item totals
+        const processedItems = items.map(item => {
+            const itemTotal = item.quantity * item.price;
+            return {
+                ...item,
+                total: itemTotal
+            };
+        });
+
+        // Calculate final totals
+        const subtotal = amount || processedItems.reduce((sum, item) => sum + item.total, 0);
+        const discountAmount = (subtotal * (discount || 0)) / 100;
+        const afterDiscount = subtotal - discountAmount;
+        const taxAmount = (afterDiscount * (tax || 0)) / 100;
+        const finalTotal = total || (afterDiscount + taxAmount + (shippingCost || 0));
+
         const quote = new Quote({
-            ...quoteData,
+            title,
+            amount: subtotal,
+            status: status || 'Pending',
+            pipeline: pipeline ? pipeline._id : null,
+            client: client ? client._id : null,
+            assignedTo: assignedToUser ? assignedToUser._id : null,
             organization: organization._id,
             createdBy: user._id,
             updatedBy: user._id,
-            pipeline: pipeline ? pipeline._id : null,
-            client: pipeline ? pipeline.client : null,
-            assignedTo: assignedToUser ? assignedToUser._id : null
+            validUntil,
+            notes,
+            items: processedItems,
+            terms,
+            discount: discount || 0,
+            tax: tax || 0,
+            total: finalTotal,
+            clientInfo: clientInfo || {},
+            billingInfo: billingInfo || {},
+            currency: currency || 'USD',
+            paymentDueDate,
+            shippingAddress: shippingAddress || {},
+            shippingMethod: shippingMethod || '',
+            shippingCost: Math.max(0, shippingCost || 0),
+            shippingNotes: shippingNotes || ''
         });
 
         await quote.save();
@@ -202,11 +280,20 @@ router.post('/create-quote', validateIds, async (req, res) => {
                 discount: populatedQuote.discount,
                 tax: populatedQuote.tax,
                 total: populatedQuote.total,
+                clientInfo: populatedQuote.clientInfo,
+                billingInfo: populatedQuote.billingInfo,
+                currency: populatedQuote.currency,
+                paymentDueDate: populatedQuote.paymentDueDate,
+                shippingAddress: populatedQuote.shippingAddress,
+                shippingMethod: populatedQuote.shippingMethod,
+                shippingCost: populatedQuote.shippingCost,
+                shippingNotes: populatedQuote.shippingNotes,
                 createdAt: populatedQuote.createdAt,
                 updatedAt: populatedQuote.updatedAt
             }
         });
     } catch (error) {
+        console.error('Error creating quote:', error);
         res.status(500).json({
             success: false,
             message: error.message
@@ -217,7 +304,30 @@ router.post('/create-quote', validateIds, async (req, res) => {
 // Update a quote
 router.post('/update-quote', validateIds, async (req, res) => {
     try {
-        const { organization_id, user_id, quote_id, ...updateData } = req.body;
+        const { 
+            organization_id, 
+            user_id, 
+            quote_id, 
+            title,
+            client_id,
+            validUntil,
+            status,
+            items,
+            notes,
+            terms,
+            discount,
+            tax,
+            total,
+            amount,
+            clientInfo,
+            billingInfo,
+            currency,
+            paymentDueDate,
+            shippingAddress,
+            shippingMethod,
+            shippingCost,
+            shippingNotes
+        } = req.body;
         
         // Find organization by org_id
         const organization = await Organization.findOne({ org_id: organization_id });
@@ -237,12 +347,93 @@ router.post('/update-quote', validateIds, async (req, res) => {
             });
         }
 
+        // Find client if provided
+        let client = null;
+        if (client_id) {
+            client = await Client.findOne({ client_id });
+            if (!client) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Client not found'
+                });
+            }
+            
+            // If clientInfo is not provided, populate it from the client
+            if (!clientInfo && client) {
+                clientInfo = {
+                    name: client.name,
+                    company: client.company,
+                    email: client.email,
+                    phone: client.phone,
+                    address: client.address,
+                    industry: client.industry,
+                    website: client.website,
+                    taxId: client.businessDetails?.taxId || '',
+                    registrationNumber: client.businessDetails?.registrationNumber || ''
+                };
+            }
+            
+            // If billingInfo is not provided, populate it from the client
+            if (!billingInfo && client) {
+                billingInfo = {
+                    name: client.name,
+                    company: client.company,
+                    address: client.financialInfo?.billingAddress || client.address,
+                    email: client.email,
+                    phone: client.phone,
+                    taxExempt: client.financialInfo?.taxExempt || false,
+                    paymentTerms: client.financialInfo?.paymentTerms || '',
+                    preferredPaymentMethod: client.financialInfo?.preferredPaymentMethod || ''
+                };
+            }
+        }
+
+        // Calculate item totals
+        const processedItems = items ? items.map(item => {
+            const itemTotal = item.quantity * item.price;
+            return {
+                ...item,
+                total: itemTotal
+            };
+        }) : undefined;
+
+        // Calculate final totals if items are provided
+        let updateData = {
+            ...(title !== undefined && { title }),
+            ...(client_id !== undefined && { client: client ? client._id : null }),
+            ...(validUntil !== undefined && { validUntil }),
+            ...(status !== undefined && { status }),
+            ...(notes !== undefined && { notes }),
+            ...(terms !== undefined && { terms }),
+            ...(discount !== undefined && { discount }),
+            ...(tax !== undefined && { tax }),
+            ...(processedItems !== undefined && { items: processedItems }),
+            ...(clientInfo !== undefined && { clientInfo }),
+            ...(billingInfo !== undefined && { billingInfo }),
+            ...(currency !== undefined && { currency }),
+            ...(paymentDueDate !== undefined && { paymentDueDate }),
+            ...(shippingAddress !== undefined && { shippingAddress }),
+            ...(shippingMethod !== undefined && { shippingMethod }),
+            ...(shippingCost !== undefined && { shippingCost }),
+            ...(shippingNotes !== undefined && { shippingNotes }),
+            updatedBy: user._id
+        };
+
+        // Calculate totals if items are provided
+        if (processedItems) {
+            const subtotal = amount || processedItems.reduce((sum, item) => sum + item.total, 0);
+            const discountAmount = (subtotal * (discount || 0)) / 100;
+            const afterDiscount = subtotal - discountAmount;
+            const taxAmount = (afterDiscount * (tax || 0)) / 100;
+            const finalTotal = total || (afterDiscount + taxAmount);
+            
+            updateData.amount = subtotal;
+            updateData.total = finalTotal;
+        }
+
         const quote = await Quote.findOneAndUpdate(
             { quote_id, organization: organization._id },
-            { 
-                ...updateData,
-                updatedBy: user._id
-            },
+            updateData,
             { new: true }
         )
         .populate('pipeline', 'title amount')
@@ -260,7 +451,7 @@ router.post('/update-quote', validateIds, async (req, res) => {
 
         // Check if the quote has been accepted
         // If so, create or update a customer record
-        if (quote.status === "Accepted") {
+        if (quote.status === "Accepted" && quote.client) {
             // Check if a customer already exists with this email
             const existingCustomer = await Customer.findOne({ 
                 email: quote.client.email,
@@ -316,6 +507,14 @@ router.post('/update-quote', validateIds, async (req, res) => {
                 discount: quote.discount,
                 tax: quote.tax,
                 total: quote.total,
+                clientInfo: quote.clientInfo,
+                billingInfo: quote.billingInfo,
+                currency: quote.currency,
+                paymentDueDate: quote.paymentDueDate,
+                shippingAddress: quote.shippingAddress,
+                shippingMethod: quote.shippingMethod,
+                shippingCost: quote.shippingCost,
+                shippingNotes: quote.shippingNotes,
                 createdAt: quote.createdAt,
                 updatedAt: quote.updatedAt
             }

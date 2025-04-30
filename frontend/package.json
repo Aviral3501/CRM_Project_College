@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@heroicons/react": "^2.2.0",
+    "@react-pdf/renderer": "^4.3.0",
     "auth-tutorial": "file:..",
     "axios": "^1.7.3",
     "framer-motion": "^11.3.21",
