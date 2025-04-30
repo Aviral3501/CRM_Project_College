@@ -7,7 +7,15 @@ import axios from 'axios';
 import { toast } from 'react-hot-toast';
 
 // Create/Edit Quote Modal
-const QuoteFormModal = ({ isOpen, onClose, onSubmit, quote = null, clients = [] }) => {
+const QuoteFormModal = ({ 
+    isOpen,
+    onClose,
+    onSubmit,
+    quote = null,
+    clients = [],
+    filterType = 'all',  
+    searchTerm = ''      
+ }) => {
     const [formData, setFormData] = useState({
         title: '',
         client_id: '',
@@ -1489,7 +1497,6 @@ const Quotes = () => {
             toast.error(error.response?.data?.message || 'Error creating quote');
         }
     };
-
     const handleUpdateQuote = async (updatedQuote) => {
         try {
             const response = await axios.post(`${BASE_URL}/quotes/update-quote`, {
@@ -1516,15 +1523,20 @@ const Quotes = () => {
                 shippingCost: updatedQuote.shippingCost,
                 shippingNotes: updatedQuote.shippingNotes
             });
-            setQuotes(quotes.map(quote => quote.quote_id === updatedQuote.quote_id ? response.data : quote));
-            toast.success('Quote updated successfully');
-            setIsFormModalOpen(false);
+    
+            if (response.data.success) {
+                // Fetch fresh data instead of updating state directly
+                await fetchQuotes();
+                toast.success('Quote updated successfully');
+                setIsFormModalOpen(false);
+            } else {
+                toast.error(response.data.message || 'Failed to update quote');
+            }
         } catch (error) {
             console.error('Error updating quote:', error);
             toast.error(error.response?.data?.message || 'Error updating quote');
         }
     };
-
     const handleDeleteQuote = async (quoteId) => {
         try {
             const response = await axios.post(`${BASE_URL}/quotes/delete-quote`, {
@@ -2010,6 +2022,8 @@ const Quotes = () => {
                 onSubmit={selectedQuote ? handleUpdateQuote : handleCreateQuote}
                 quote={selectedQuote}
                 clients={clients}
+                filterType={filterType}    // Add this prop
+                searchTerm={searchTerm}    // Add this prop
             />
 
             <DeleteQuoteModal
