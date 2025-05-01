@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import Card from '../../components/ui/Card';
 import { Plus, Calendar, Users, Clock, MoreVertical, X, AlertTriangle, Edit2, Trash2, Search } from 'lucide-react';
 // Update the imports to remove TreeMap
-import {
-    ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-    Radar, Legend, Tooltip, ComposedChart, CartesianGrid, XAxis, YAxis, Bar,
+import { 
+    ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, 
+    Radar, Legend, Tooltip, ComposedChart, CartesianGrid, XAxis, YAxis, Bar, 
     Line, Scatter, AreaChart, Area, PieChart, Pie, Cell,
     LineChart, BarChart
 } from 'recharts';
@@ -213,10 +213,10 @@ const Projects = () => {
                 project_dueDate: newProject.deadline,
                 project_team: newProject.team
             };
-
+            
             console.log('Sending project payload:', projectPayload);
             const response = await axios.post(`${BASE_URL}/projects/create-project`, projectPayload);
-
+            
             if (response.data.success) {
                 setProjects(prev => [...prev, response.data.data]);
                 toast.success("Project created successfully");
@@ -317,7 +317,7 @@ const Projects = () => {
             const completedTasks = project.tasks?.filter(t => t.status === 'Completed').length || 0;
             const onTrack = project.deadline ? new Date(project.deadline) > new Date() : true;
             const teamSize = project.team?.length || 0;
-
+            
             return {
                 name: project.name,
                 completionRate: totalTasks ? (completedTasks / totalTasks) * 100 : 0,
@@ -327,7 +327,7 @@ const Projects = () => {
             };
         });
     };
-
+    
     const getTaskDistribution = () => {
         const distribution = {
             'Not Started': 0,
@@ -335,22 +335,22 @@ const Projects = () => {
             'Completed': 0,
             'On Hold': 0
         };
-
+    
         projects.forEach(project => {
             (project.tasks || []).forEach(task => {
                 distribution[task.status] = (distribution[task.status] || 0) + 1;
             });
         });
-
+    
         return Object.entries(distribution).map(([status, count]) => ({
             name: status,
             value: count
         }));
     };
-
+    
     const getTeamWorkload = () => {
         const workload = {};
-
+        
         projects.forEach(project => {
             (project.team || []).forEach(member => {
                 if (!workload[member]) {
@@ -363,7 +363,7 @@ const Projects = () => {
                 } else {
                     workload[member].projects += 1;
                 }
-
+                
                 // Count tasks assigned to this member
                 (project.tasks || []).forEach(task => {
                     if (task.assignee === member) {
@@ -375,10 +375,10 @@ const Projects = () => {
                 });
             });
         });
-
+    
         return Object.values(workload);
     };
-
+    
     const getProjectTimeline = () => {
         return projects.map(project => ({
             name: project.name,
@@ -531,13 +531,13 @@ const Projects = () => {
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
                                 <span className={`px-2 py-1 text-xs rounded-full ${project.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                                    project.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                                        'bg-yellow-100 text-yellow-800'
+                                        project.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
+                                            'bg-yellow-100 text-yellow-800'
                                     }`}>
                                     {project.status}
                                 </span>
                                 <span className={`px-2 py-1 text-xs rounded-full ${project.priority === 'High' ? 'bg-red-100 text-red-800' :
-                                    'bg-orange-100 text-orange-800'
+                                        'bg-orange-100 text-orange-800'
                                     }`}>
                                     {project.priority}
                                 </span>
@@ -646,112 +646,112 @@ const Projects = () => {
             </div>
 
             {/* Add this new grid of charts after your existing charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                {/* Project Health Dashboard */}
-                <Card className="p-6">
-                    <h2 className="text-lg font-semibold mb-4">Project Health Dashboard</h2>
-                    <div className="h-[400px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={getProjectHealthMetrics()}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
-                                <YAxis />
-                                <Tooltip />
-                                <Legend />
-                                <Bar dataKey="completionRate" name="Completion Rate" fill="#4CAF50" />
-                                <Bar dataKey="onSchedule" name="Schedule Performance" fill="#2196F3" />
-                                <Bar dataKey="teamEfficiency" name="Team Efficiency" fill="#FF9800" />
-                                <Bar dataKey="riskScore" name="Risk Level" fill="#f44336" />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                </Card>
+<div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    {/* Project Health Dashboard */}
+    <Card className="p-6">
+        <h2 className="text-lg font-semibold mb-4">Project Health Dashboard</h2>
+        <div className="h-[400px]">
+            <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={getProjectHealthMetrics()}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="completionRate" name="Completion Rate" fill="#4CAF50" />
+                    <Bar dataKey="onSchedule" name="Schedule Performance" fill="#2196F3" />
+                    <Bar dataKey="teamEfficiency" name="Team Efficiency" fill="#FF9800" />
+                    <Bar dataKey="riskScore" name="Risk Level" fill="#f44336" />
+                </BarChart>
+            </ResponsiveContainer>
+        </div>
+    </Card>
 
-                {/* Task Status Distribution */}
-                <Card className="p-6">
-                    <h2 className="text-lg font-semibold mb-4">Task Status Distribution</h2>
-                    <div className="h-[400px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={getTaskDistribution()}
-                                    dataKey="value"
-                                    nameKey="name"
-                                    cx="50%"
-                                    cy="50%"
-                                    outerRadius={150}
-                                    label
-                                >
-                                    {getTaskDistribution().map((entry, index) => (
-                                        <Cell
-                                            key={`cell-${index}`}
-                                            fill={[
-                                                '#FF9800', // Not Started
-                                                '#2196F3', // In Progress
-                                                '#4CAF50', // Completed
-                                                '#9E9E9E'  // On Hold
-                                            ][index % 4]}
-                                        />
-                                    ))}
-                                </Pie>
-                                <Tooltip />
-                                <Legend />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </div>
-                </Card>
+    {/* Task Status Distribution */}
+    <Card className="p-6">
+        <h2 className="text-lg font-semibold mb-4">Task Status Distribution</h2>
+        <div className="h-[400px]">
+            <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                    <Pie
+                        data={getTaskDistribution()}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={150}
+                        label
+                    >
+                        {getTaskDistribution().map((entry, index) => (
+                            <Cell 
+                                key={`cell-${index}`} 
+                                fill={[
+                                    '#FF9800', // Not Started
+                                    '#2196F3', // In Progress
+                                    '#4CAF50', // Completed
+                                    '#9E9E9E'  // On Hold
+                                ][index % 4]} 
+                            />
+                        ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                </PieChart>
+            </ResponsiveContainer>
+        </div>
+    </Card>
 
-                {/* Team Workload Analysis */}
-                <Card className="p-6">
-                    <h2 className="text-lg font-semibold mb-4">Team Workload Analysis</h2>
-                    <div className="h-[400px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <ComposedChart data={getTeamWorkload()}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
-                                <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
-                                <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" />
-                                <Tooltip />
-                                <Legend />
-                                <Bar yAxisId="left" dataKey="totalTasks" name="Total Tasks" fill="#8884d8" />
-                                <Bar yAxisId="left" dataKey="completedTasks" name="Completed Tasks" fill="#82ca9d" />
-                                <Line yAxisId="right" type="monotone" dataKey="projects" name="Projects Involved" stroke="#ff7300" />
-                            </ComposedChart>
-                        </ResponsiveContainer>
-                    </div>
-                </Card>
+    {/* Team Workload Analysis */}
+    <Card className="p-6">
+        <h2 className="text-lg font-semibold mb-4">Team Workload Analysis</h2>
+        <div className="h-[400px]">
+            <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={getTeamWorkload()}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
+                    <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
+                    <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" />
+                    <Tooltip />
+                    <Legend />
+                    <Bar yAxisId="left" dataKey="totalTasks" name="Total Tasks" fill="#8884d8" />
+                    <Bar yAxisId="left" dataKey="completedTasks" name="Completed Tasks" fill="#82ca9d" />
+                    <Line yAxisId="right" type="monotone" dataKey="projects" name="Projects Involved" stroke="#ff7300" />
+                </ComposedChart>
+            </ResponsiveContainer>
+        </div>
+    </Card>
 
-                {/* Project Timeline Overview */}
-                <Card className="p-6">
-                    <h2 className="text-lg font-semibold mb-4">Project Timeline Overview</h2>
-                    <div className="h-[400px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={getProjectTimeline()}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis
-                                    dataKey="name"
-                                    angle={-45}
-                                    textAnchor="end"
-                                    height={80}
-                                />
-                                <YAxis />
-                                <Tooltip
-                                    labelFormatter={(value) => `Project: ${value}`}
-                                    formatter={(value) => [`${value}%`, 'Completion']}
-                                />
-                                <Legend />
-                                <Area
-                                    type="monotone"
-                                    dataKey="completion"
-                                    stroke="#8884d8"
-                                    fill="#8884d8"
-                                    name="Project Progress"
-                                />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-                </Card>
-            </div>
+    {/* Project Timeline Overview */}
+    <Card className="p-6">
+        <h2 className="text-lg font-semibold mb-4">Project Timeline Overview</h2>
+        <div className="h-[400px]">
+            <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={getProjectTimeline()}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                        dataKey="name" 
+                        angle={-45} 
+                        textAnchor="end" 
+                        height={80}
+                    />
+                    <YAxis />
+                    <Tooltip 
+                        labelFormatter={(value) => `Project: ${value}`}
+                        formatter={(value) => [`${value}%`, 'Completion']}
+                    />
+                    <Legend />
+                    <Area 
+                        type="monotone" 
+                        dataKey="completion" 
+                        stroke="#8884d8" 
+                        fill="#8884d8" 
+                        name="Project Progress"
+                    />
+                </AreaChart>
+            </ResponsiveContainer>
+        </div>
+    </Card>
+</div>
 
 
 
@@ -1234,24 +1234,37 @@ const AddProjectModal = ({ isOpen, onClose, onSubmit, selectedTeamMembers, setSe
                             {/* Task List */}
                             <div className="space-y-2">
                                 {formData.tasks.map((task, index) => (
-                                    <div key={task.id || index} className="p-3 bg-gray-50 rounded-md">
+                                    <div key={task._id || index} className="p-3 bg-gray-50 rounded-md">
                                         <div className="flex justify-between items-start">
-                                            <div>
-                                                <h4 className="font-medium">{task.title}</h4>
+                                            <div className="flex-1">
+                                                <h4 className="font-medium">{task.title || 'Untitled Task'}</h4>
                                                 <p className="text-sm text-gray-500">{task.description}</p>
                                                 <div className="flex items-center gap-2 mt-1">
-                                                    <span className={`px-2 py-1 text-xs rounded-full ${task.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                                                        task.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                                                            'bg-yellow-100 text-yellow-800'
+                                                    <span className={`px-2 py-1 text-xs rounded-full ${
+                                                        task.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                                                            task.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
+                                                                'bg-yellow-100 text-yellow-800'
                                                         }`}>
                                                         {task.status}
                                                     </span>
-                                                    <span className={`px-2 py-1 text-xs rounded-full ${task.priority === 'High' ? 'bg-red-100 text-red-800' :
-                                                        'bg-orange-100 text-orange-800'
+                                                    <span className={`px-2 py-1 text-xs rounded-full ${
+                                                        task.priority === 'High' ? 'bg-red-100 text-red-800' :
+                                                        task.priority === 'Urgent' ? 'bg-purple-100 text-purple-800' :
+                                                            'bg-orange-100 text-orange-800'
                                                         }`}>
                                                         {task.priority}
                                                     </span>
                                                 </div>
+                                                {task.dueDate && (
+                                                    <div className="text-xs text-gray-500 mt-1">
+                                                        Due: {new Date(task.dueDate).toLocaleDateString()}
+                                                    </div>
+                                                )}
+                                                {task.assignedTo && task.assignedTo.length > 0 && (
+                                                    <div className="text-xs text-gray-500 mt-1">
+                                                        Assigned to: {task.assignedTo.join(', ')}
+                                                    </div>
+                                                )}
                                             </div>
                                             <button
                                                 type="button"
@@ -1266,11 +1279,55 @@ const AddProjectModal = ({ isOpen, onClose, onSubmit, selectedTeamMembers, setSe
                                                 <X size={16} />
                                             </button>
                                         </div>
-                                        {task.subtasks.length > 0 && (
-                                            <div className="mt-2 pl-4 space-y-1">
+
+                                        {/* Subtasks */}
+                                        {task.subtasks && task.subtasks.length > 0 && (
+                                            <div className="mt-3 pl-4 space-y-2 border-l-2 border-gray-200">
                                                 {task.subtasks.map((subtask, idx) => (
-                                                    <div key={subtask.id || idx} className="text-sm text-gray-600">
-                                                        • {subtask.title}
+                                                    <div key={subtask._id || idx} className="flex items-start justify-between">
+                                                        <div className="flex-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full"></span>
+                                                                <span className="font-medium text-sm">{subtask.title}</span>
+                                                            </div>
+                                                            {subtask.description && (
+                                                                <p className="text-xs text-gray-500 ml-3.5 mt-0.5">
+                                                                    {subtask.description}
+                                                                </p>
+                                                            )}
+                                                            <div className="flex items-center gap-2 ml-3.5 mt-1">
+                                                                <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
+                                                                    {subtask.status}
+                                                                </span>
+                                                                {subtask.dueDate && (
+                                                                    <span className="text-xs text-gray-500">
+                                                                        Due: {new Date(subtask.dueDate).toLocaleDateString()}
+                                                                    </span>
+                                                                )}
+                                                                {subtask.assignedTo && (
+                                                                    <span className="text-xs text-gray-500">
+                                                                        Assigned: {subtask.assignedTo}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setFormData(prev => ({
+                                                                    ...prev,
+                                                                    tasks: prev.tasks.map((t, i) => 
+                                                                        i === index ? {
+                                                                            ...t,
+                                                                            subtasks: t.subtasks.filter((_, si) => si !== idx)
+                                                                        } : t
+                                                                    )
+                                                                }));
+                                                            }}
+                                                            className="text-red-500 hover:text-red-700"
+                                                        >
+                                                            <X size={14} />
+                                                        </button>
                                                     </div>
                                                 ))}
                                             </div>
@@ -1345,7 +1402,7 @@ const EditProjectModal = ({ isOpen, onClose, onSubmit, project }) => {
                     // If t is a string, find the employee by user_id or name
                     : employees.find(emp => emp.user_id === t || emp.name === t)
             ).filter(Boolean); // Remove any undefined
-
+    
             setFormData({
                 name: project.name || '',
                 description: project.description || '',
@@ -1776,24 +1833,37 @@ const EditProjectModal = ({ isOpen, onClose, onSubmit, project }) => {
                             {/* Task List */}
                             <div className="space-y-2">
                                 {formData.tasks.map((task, index) => (
-                                    <div key={task.id || index} className="p-3 bg-gray-50 rounded-md">
+                                    <div key={task._id || index} className="p-3 bg-gray-50 rounded-md">
                                         <div className="flex justify-between items-start">
-                                            <div>
-                                                <h4 className="font-medium">{task.title}</h4>
+                                            <div className="flex-1">
+                                                <h4 className="font-medium">{task.title || 'Untitled Task'}</h4>
                                                 <p className="text-sm text-gray-500">{task.description}</p>
                                                 <div className="flex items-center gap-2 mt-1">
-                                                    <span className={`px-2 py-1 text-xs rounded-full ${task.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                                                        task.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                                                            'bg-yellow-100 text-yellow-800'
+                                                    <span className={`px-2 py-1 text-xs rounded-full ${
+                                                        task.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                                                            task.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
+                                                                'bg-yellow-100 text-yellow-800'
                                                         }`}>
                                                         {task.status}
                                                     </span>
-                                                    <span className={`px-2 py-1 text-xs rounded-full ${task.priority === 'High' ? 'bg-red-100 text-red-800' :
-                                                        'bg-orange-100 text-orange-800'
+                                                    <span className={`px-2 py-1 text-xs rounded-full ${
+                                                        task.priority === 'High' ? 'bg-red-100 text-red-800' :
+                                                        task.priority === 'Urgent' ? 'bg-purple-100 text-purple-800' :
+                                                            'bg-orange-100 text-orange-800'
                                                         }`}>
                                                         {task.priority}
                                                     </span>
                                                 </div>
+                                                {task.dueDate && (
+                                                    <div className="text-xs text-gray-500 mt-1">
+                                                        Due: {new Date(task.dueDate).toLocaleDateString()}
+                                                    </div>
+                                                )}
+                                                {task.assignedTo && task.assignedTo.length > 0 && (
+                                                    <div className="text-xs text-gray-500 mt-1">
+                                                        Assigned to: {task.assignedTo.join(', ')}
+                                                    </div>
+                                                )}
                                             </div>
                                             <button
                                                 type="button"
@@ -1808,11 +1878,55 @@ const EditProjectModal = ({ isOpen, onClose, onSubmit, project }) => {
                                                 <X size={16} />
                                             </button>
                                         </div>
-                                        {task.subtasks.length > 0 && (
-                                            <div className="mt-2 pl-4 space-y-1">
+
+                                        {/* Subtasks */}
+                                        {task.subtasks && task.subtasks.length > 0 && (
+                                            <div className="mt-3 pl-4 space-y-2 border-l-2 border-gray-200">
                                                 {task.subtasks.map((subtask, idx) => (
-                                                    <div key={subtask.id || idx} className="text-sm text-gray-600">
-                                                        • {subtask.title}
+                                                    <div key={subtask._id || idx} className="flex items-start justify-between">
+                                                        <div className="flex-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full"></span>
+                                                                <span className="font-medium text-sm">{subtask.title}</span>
+                                                            </div>
+                                                            {subtask.description && (
+                                                                <p className="text-xs text-gray-500 ml-3.5 mt-0.5">
+                                                                    {subtask.description}
+                                                                </p>
+                                                            )}
+                                                            <div className="flex items-center gap-2 ml-3.5 mt-1">
+                                                                <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
+                                                                    {subtask.status}
+                                                                </span>
+                                                                {subtask.dueDate && (
+                                                                    <span className="text-xs text-gray-500">
+                                                                        Due: {new Date(subtask.dueDate).toLocaleDateString()}
+                                                                    </span>
+                                                                )}
+                                                                {subtask.assignedTo && (
+                                                                    <span className="text-xs text-gray-500">
+                                                                        Assigned: {subtask.assignedTo}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setFormData(prev => ({
+                                                                    ...prev,
+                                                                    tasks: prev.tasks.map((t, i) => 
+                                                                        i === index ? {
+                                                                            ...t,
+                                                                            subtasks: t.subtasks.filter((_, si) => si !== idx)
+                                                                        } : t
+                                                                    )
+                                                                }));
+                                                            }}
+                                                            className="text-red-500 hover:text-red-700"
+                                                        >
+                                                            <X size={14} />
+                                                        </button>
                                                     </div>
                                                 ))}
                                             </div>
@@ -1877,13 +1991,13 @@ const DeleteProjectModal = ({ isOpen, onClose, project, onProceed }) => {
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className={`px-2 py-1 text-xs rounded-full ${project?.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                                    project?.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                                        'bg-yellow-100 text-yellow-800'
+                                        project?.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
+                                            'bg-yellow-100 text-yellow-800'
                                     }`}>
                                     {project?.status}
                                 </span>
                                 <span className={`px-2 py-1 text-xs rounded-full ${project?.priority === 'High' ? 'bg-red-100 text-red-800' :
-                                    'bg-orange-100 text-orange-800'
+                                        'bg-orange-100 text-orange-800'
                                     }`}>
                                     {project?.priority}
                                 </span>
