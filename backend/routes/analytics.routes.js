@@ -330,7 +330,10 @@ router.post('/sales', validateIds, async (req, res) => {
         const end = endDate ? new Date(endDate) : new Date();
         const start = startDate ? new Date(startDate) : new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
         
-        // Find organization
+        // Define twelveMonthsAgo here
+        const twelveMonthsAgo = new Date();
+        twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+        
         const organization = await Organization.findOne({ org_id: organization_id });
         if (!organization) {
             return res.status(404).json({
@@ -338,57 +341,212 @@ router.post('/sales', validateIds, async (req, res) => {
                 message: 'Organization not found'
             });
         }
+
+        // Calculate conversion rates
+        const [leadStats, quoteStats] = await Promise.all([
+            // Lead to Customer conversion
+            Customer.aggregate([
+                { 
+                    $match: { 
+                        organization: organization._id,
+                        createdAt: { $gte: twelveMonthsAgo }
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        totalLeads: { $sum: 1 },
+                        convertedLeads: {
+                            $sum: {
+                                $cond: [
+                                    { $gt: ["$totalValue", 0] },
+                                    1,
+                                    0
+                                ]
+                            }
+                        }
+                    }
+                }
+            ]),
+            // Quote to Deal conversion
+            Quote.aggregate([
+                {
+                    $match: {
+                        organization: organization._id,
+                        createdAt: { $gte: twelveMonthsAgo }
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        totalQuotes: { $sum: 1 },
+                        acceptedQuotes: {
+                            $sum: {
+                                $cond: [
+                                    { $eq: ["$status", "Accepted"] },
+                                    1,
+                                    0
+                                ]
+                            }
+                        }
+                    }
+                }
+            ])
+        ]);
+
+        // Calculate conversion rates with fallback to 0 if no data
+        const leadToCustomer = leadStats.length > 0 
+            ? (leadStats[0].convertedLeads / leadStats[0].totalLeads) * 100 
+            : 0;
         
-        // Get lead to customer conversion rate
-        const totalLeads = await Lead.countDocuments({ organization: organization._id });
-        const convertedLeads = await Lead.countDocuments({ 
-            organization: organization._id,
-            status: 'Converted'
-        });
-        const conversionRate = totalLeads > 0 ? (convertedLeads / totalLeads) * 100 : 0;
-        
-        // Get quote to deal conversion rate
-        const totalQuotes = await Quote.countDocuments({ organization: organization._id });
-        const acceptedQuotes = await Quote.countDocuments({ 
-            organization: organization._id,
-            status: 'Accepted'
-        });
-        const quoteConversionRate = totalQuotes > 0 ? (acceptedQuotes / totalQuotes) * 100 : 0;
-        
-        // Get pipeline stage distribution
+        const quoteToDeal = quoteStats.length > 0 
+            ? (quoteStats[0].acceptedQuotes / quoteStats[0].totalQuotes) * 100 
+            : 0;
+
+        // Enhanced pipeline stage distribution with more details
         const pipelineStages = await Pipeline.aggregate([
             { $match: { organization: organization._id } },
-            { $group: { _id: '$stage', count: { $sum: 1 }, total: { $sum: '$amount' } } },
+            {
+                $lookup: {
+                    from: 'clients',
+                    localField: 'client',
+                    foreignField: '_id',
+                    as: 'clientDetails'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'assignedTo',
+                    foreignField: '_id',
+                    as: 'assignedToDetails'
+                }
+            },
+            {
+                $group: {
+                    _id: '$stage',
+                    count: { $sum: 1 },
+                    total: { $sum: '$amount' },
+                    avgDealSize: { $avg: '$amount' },
+                    deals: {
+                        $push: {
+                            pipeline_id: '$pipeline_id',
+                            title: '$title',
+                            amount: '$amount',
+                            probability: '$probability',
+                            expectedCloseDate: '$expectedCloseDate',
+                            client: { $arrayElemAt: ['$clientDetails', 0] },
+                            assignedTo: { $arrayElemAt: ['$assignedToDetails', 0] }
+                        }
+                    }
+                }
+            },
             { $sort: { total: -1 } }
         ]);
-        
-        // Get quote value distribution by status
+
+        // Enhanced quote value distribution with more details
         const quoteValueByStatus = await Quote.aggregate([
             { $match: { organization: organization._id } },
-            { $group: { _id: '$status', count: { $sum: 1 }, total: { $sum: '$amount' } } },
+            {
+                $lookup: {
+                    from: 'clients',
+                    localField: 'client',
+                    foreignField: '_id',
+                    as: 'clientDetails'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'createdBy',
+                    foreignField: '_id',
+                    as: 'createdByDetails'
+                }
+            },
+            {
+                $group: {
+                    _id: '$status',
+                    count: { $sum: 1 },
+                    total: { $sum: '$amount' },
+                    avgQuoteValue: { $avg: '$amount' },
+                    quotes: {
+                        $push: {
+                            quote_id: '$quote_id',
+                            title: '$title',
+                            amount: '$amount',
+                            validUntil: '$validUntil',
+                            client: { $arrayElemAt: ['$clientDetails', 0] },
+                            createdBy: { $arrayElemAt: ['$createdByDetails', 0] },
+                            items: '$items'
+                        }
+                    }
+                }
+            },
             { $sort: { total: -1 } }
         ]);
-        
-        // Get top customers by value
+
+        // Enhanced top customers with more metrics
         const topCustomers = await Customer.aggregate([
             { $match: { organization: organization._id } },
+            {
+                $lookup: {
+                    from: 'deals',
+                    localField: '_id',
+                    foreignField: 'client',
+                    as: 'deals'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'quotes',
+                    localField: '_id',
+                    foreignField: 'client',
+                    as: 'quotes'
+                }
+            },
+            {
+                $project: {
+                    _id: 1,
+                    name: 1,
+                    company: 1,
+                    email: 1,
+                    phone: 1,
+                    totalValue: 1,
+                    lastPurchase: 1,
+                    dealsCount: { $size: '$deals' },
+                    quotesCount: { $size: '$quotes' },
+                    avgDealSize: { $avg: '$deals.amount' },
+                    totalQuoteValue: { $sum: '$quotes.amount' },
+                    recentDeals: {
+                        $slice: [{
+                            $sortArray: {
+                                input: '$deals',
+                                sortBy: { createdAt: -1 }
+                            }
+                        }, 3]
+                    }
+                }
+            },
             { $sort: { totalValue: -1 } },
-            { $limit: 5 },
-            { $project: { _id: 1, name: 1, totalValue: 1, lastPurchase: 1 } }
+            { $limit: 5 }
         ]);
-        
-        // Get sales by month (last 12 months)
-        const twelveMonthsAgo = new Date();
-        twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-        
+
+        // Enhanced sales by month with more metrics
         const salesByMonth = await Promise.all([
-            // Monthly quotes
             Quote.aggregate([
                 { 
                     $match: { 
                         organization: organization._id,
                         createdAt: { $gte: twelveMonthsAgo }
                     } 
+                },
+                {
+                    $lookup: {
+                        from: 'clients',
+                        localField: 'client',
+                        foreignField: '_id',
+                        as: 'clientDetails'
+                    }
                 },
                 { 
                     $group: { 
@@ -398,28 +556,38 @@ router.post('/sales', validateIds, async (req, res) => {
                         },
                         count: { $sum: 1 },
                         total: { $sum: '$amount' },
-                        accepted: { 
-                            $sum: { 
-                                $cond: [{ $eq: ['$status', 'Accepted'] }, 1, 0] 
-                            } 
-                        },
-                        acceptedValue: { 
-                            $sum: { 
-                                $cond: [{ $eq: ['$status', 'Accepted'] }, '$amount', 0] 
-                            } 
+                        accepted: { $sum: { $cond: [{ $eq: ['$status', 'Accepted'] }, 1, 0] } },
+                        acceptedValue: { $sum: { $cond: [{ $eq: ['$status', 'Accepted'] }, '$amount', 0] } },
+                        avgQuoteValue: { $avg: '$amount' },
+                        quotes: {
+                            $push: {
+                                quote_id: '$quote_id',
+                                title: '$title',
+                                amount: '$amount',
+                                status: '$status',
+                                client: { $arrayElemAt: ['$clientDetails', 0] }
+                            }
                         }
                     } 
                 },
                 { $sort: { '_id.year': 1, '_id.month': 1 } }
             ]),
             
-            // Monthly deals
+            // Enhanced deals by month
             Deal.aggregate([
                 { 
                     $match: { 
                         organization: organization._id,
                         createdAt: { $gte: twelveMonthsAgo }
                     } 
+                },
+                {
+                    $lookup: {
+                        from: 'clients',
+                        localField: 'client',
+                        foreignField: '_id',
+                        as: 'clientDetails'
+                    }
                 },
                 { 
                     $group: { 
@@ -428,58 +596,66 @@ router.post('/sales', validateIds, async (req, res) => {
                             month: { $month: '$createdAt' }
                         },
                         count: { $sum: 1 },
-                        total: { $sum: '$amount' }
+                        total: { $sum: '$amount' },
+                        avgDealSize: { $avg: '$amount' },
+                        deals: {
+                            $push: {
+                                deal_id: '$deal_id',
+                                title: '$title',
+                                amount: '$amount',
+                                status: '$status',
+                                client: { $arrayElemAt: ['$clientDetails', 0] }
+                            }
+                        }
                     } 
                 },
                 { $sort: { '_id.year': 1, '_id.month': 1 } }
             ])
         ]);
-        
-        // Get sales by user (top performers)
-        const salesByUser = await Promise.all([
-            // Quotes by user
+
+        // Enhanced top performers with more metrics
+        const topPerformers = await Promise.all([
             Quote.aggregate([
                 { $match: { organization: organization._id } },
-                { $group: { _id: '$createdBy', count: { $sum: 1 }, total: { $sum: '$amount' } } },
-                { $sort: { total: -1 } },
-                { $limit: 5 },
-                { 
+                {
                     $lookup: {
                         from: 'users',
                         localField: '_id',
                         foreignField: '_id',
-                        as: 'user'
+                        as: 'userDetails'
                     }
                 },
-                { $unwind: '$user' },
-                { $project: { _id: 1, name: '$user.name', count: 1, total: 1 } }
-            ]),
-            
-            // Deals by user
-            Deal.aggregate([
-                { $match: { organization: organization._id } },
-                { $group: { _id: '$createdBy', count: { $sum: 1 }, total: { $sum: '$amount' } } },
+                {
+                    $group: {
+                        _id: '$createdBy',
+                        count: { $sum: 1 },
+                        total: { $sum: '$amount' },
+                        avgQuoteValue: { $avg: '$amount' },
+                        successRate: {
+                            $avg: { $cond: [{ $eq: ['$status', 'Accepted'] }, 1, 0] }
+                        },
+                        recentQuotes: {
+                            $push: {
+                                quote_id: '$quote_id',
+                                title: '$title',
+                                amount: '$amount',
+                                status: '$status',
+                                createdAt: '$createdAt'
+                            }
+                        }
+                    }
+                },
                 { $sort: { total: -1 } },
-                { $limit: 5 },
-                { 
-                    $lookup: {
-                        from: 'users',
-                        localField: '_id',
-                        foreignField: '_id',
-                        as: 'user'
-                    }
-                },
-                { $unwind: '$user' },
-                { $project: { _id: 1, name: '$user.name', count: 1, total: 1 } }
+                { $limit: 5 }
             ])
         ]);
-        
+
         res.json({
             success: true,
             data: {
                 conversionRates: {
-                    leadToCustomer: conversionRate,
-                    quoteToDeal: quoteConversionRate
+                    leadToCustomer: parseFloat(leadToCustomer.toFixed(2)),
+                    quoteToDeal: parseFloat(quoteToDeal.toFixed(2))
                 },
                 pipelineStages,
                 quoteValueByStatus,
@@ -489,8 +665,8 @@ router.post('/sales', validateIds, async (req, res) => {
                     deals: salesByMonth[1]
                 },
                 topPerformers: {
-                    quotes: salesByUser[0],
-                    deals: salesByUser[1]
+                    quotes: topPerformers[0],
+                    deals: topPerformers[1]
                 }
             }
         });

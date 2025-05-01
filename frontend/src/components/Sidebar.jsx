@@ -50,11 +50,11 @@ const Sidebar = () => {
             icon: <BarChart2 size={20} />,
             path: "/analytics"
         },
-        {
-            title: "Notifications",
-            icon: <Bell size={20} />,
-            path: "/notifications"
-        }
+        // {
+        //     title: "Notifications",
+        //     icon: <Bell size={20} />,
+        //     path: "/notifications"
+        // }
     ];
 
     return (

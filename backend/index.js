@@ -15,6 +15,7 @@ import leadRoutes from "./routes/lead.routes.js";
 import clientRoutes from "./routes/client.routes.js";
 import pipelineRoutes from "./routes/pipeline.routes.js";
 import quoteRoutes from "./routes/quote.routes.js";
+import analyticsRoutes from "./routes/analytics.routes.js";
 
 dotenv.config();
 
@@ -49,7 +50,7 @@ app.use("/api/leads", leadRoutes);
 app.use("/api/clients", clientRoutes);
 app.use("/api/pipeline", pipelineRoutes);
 app.use("/api/quotes", quoteRoutes);
-
+app.use("/api/analytics", analyticsRoutes);
 
 if (process.env.NODE_ENV === "production") {
 	app.use(express.static(path.join(__dirname, "/frontend/dist")));
