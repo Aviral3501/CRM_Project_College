@@ -51,29 +51,29 @@ const Analytics = () => {
                     dashboardData.statusDistribution.pipeline.find(s => s._id === 'Closed Won')?.count || 0,
                     dashboardData.counts.pipeline
                 ),
-                icon: <DollarSign className="text-green-500" size={24} />
-            },
-            {
-                title: 'Active Projects',
+            icon: <DollarSign className="text-green-500" size={24} />
+        },
+        {
+            title: 'Active Projects',
                 value: dashboardData.statusDistribution.projects.find(s => s._id === 'In Progress')?.count || 0,
                 change: `${dashboardData.counts.projects} Total`,
-                icon: <Briefcase className="text-blue-500" size={24} />
-            },
-            {
+            icon: <Briefcase className="text-blue-500" size={24} />
+        },
+        {
                 title: 'Lead Conversion',
                 value: `${((dashboardData.statusDistribution.leads.find(s => s._id === 'Converted')?.count || 0) / 
                     dashboardData.counts.leads * 100).toFixed(1)}%`,
                 change: `${dashboardData.counts.leads} Total Leads`,
-                icon: <Users className="text-purple-500" size={24} />
-            },
-            {
+            icon: <Users className="text-purple-500" size={24} />
+        },
+        {
                 title: 'Task Completion',
                 value: `${((dashboardData.statusDistribution.tasks.find(s => s._id === 'Completed')?.count || 0) / 
                     dashboardData.counts.tasks * 100).toFixed(1)}%`,
                 change: `${dashboardData.counts.tasks} Total Tasks`,
-                icon: <TrendingUp className="text-orange-500" size={24} />
-            }
-        ];
+            icon: <TrendingUp className="text-orange-500" size={24} />
+        }
+    ];
     };
 
     // Dynamic recent activities based on real data
@@ -192,8 +192,8 @@ const Analytics = () => {
     
             if (userData.organization_id && userData.user_id) {
                 fetchDashboardAnalytics();
-            }
-        }, [userData.organization_id, userData.user_id, BASE_URL]);
+        }
+    }, [userData.organization_id, userData.user_id, BASE_URL]);
 
     return (
         <div className="p-6 space-y-8">
@@ -255,15 +255,15 @@ const Analytics = () => {
                     <div className="space-y-4">
                         {!isLoading && dashboardData && getPerformanceMetrics().map((metric, index) => (
                             <div key={index} className="space-y-2">
-                                <div className="flex justify-between text-sm">
+                            <div className="flex justify-between text-sm">
                                     <span>{metric.label}</span>
                                     <span className="font-medium">{metric.value}%</span>
-                                </div>
-                                <div className="w-full bg-gray-200 rounded-full h-2">
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
                                     <div className={`bg-${metric.color}-500 h-2 rounded-full`} 
                                          style={{ width: `${metric.value}%` }}></div>
-                                </div>
                             </div>
+                        </div>
                         ))}
                     </div>
                 </Card>
@@ -279,20 +279,15 @@ export default Analytics;
 
 
 const SalesAnalytics = ({ salesData }) => {
-    const [selectedView, setSelectedView] = useState('overview'); // 'overview', 'pipeline', 'deals', 'quotes'
+    const [selectedView, setSelectedView] = useState('overview');
     const [selectedEmployee, setSelectedEmployee] = useState('all');
-    const [selectedTimeRange, setSelectedTimeRange] = useState('month'); // 'week', 'month', 'quarter', 'year'
+    const [selectedTimeRange, setSelectedTimeRange] = useState('month');
     const [selectedClient, setSelectedClient] = useState('all');
+    const [filteredData, setFilteredData] = useState(salesData);
 
     const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ffc658'];
-    const GRADIENTS = [
-        ['#FF8042', '#FFB88C'],
-        ['#00C49F', '#92FFC0'],
-        ['#0088FE', '#6EB4FF'],
-        ['#8884d8', '#B8B5FF']
-    ];
 
-    // Extract unique employees, clients for dropdowns
+    // Extract unique employees and clients
     const employees = [...new Set(salesData.pipelineStages.flatMap(stage => 
         stage.deals.map(deal => deal.assignedTo.name)
     ))];
@@ -302,19 +297,100 @@ const SalesAnalytics = ({ salesData }) => {
     ))];
 
     // Filter data based on selections
-    const filterData = (data) => {
-        let filtered = data;
-        if (selectedEmployee !== 'all') {
-            filtered = filtered.filter(item => item.assignedTo?.name === selectedEmployee);
+    useEffect(() => {
+        let filtered = { ...salesData };
+
+        // Filter pipeline stages
+        if (selectedEmployee !== 'all' || selectedClient !== 'all') {
+            filtered.pipelineStages = salesData.pipelineStages.map(stage => {
+                const filteredDeals = stage.deals.filter(deal => {
+                    const employeeMatch = selectedEmployee === 'all' || deal.assignedTo.name === selectedEmployee;
+                    const clientMatch = selectedClient === 'all' || deal.client.company === selectedClient;
+                    return employeeMatch && clientMatch;
+                });
+
+                return {
+                    ...stage,
+                    deals: filteredDeals,
+                    count: filteredDeals.length,
+                    total: filteredDeals.reduce((sum, deal) => sum + deal.amount, 0),
+                    avgDealSize: filteredDeals.length ? 
+                        filteredDeals.reduce((sum, deal) => sum + deal.amount, 0) / filteredDeals.length : 0
+                };
+            });
         }
-        if (selectedClient !== 'all') {
-            filtered = filtered.filter(item => item.client?.company === selectedClient);
+
+        // Filter quotes
+        if (selectedEmployee !== 'all' || selectedClient !== 'all') {
+            filtered.quoteValueByStatus = salesData.quoteValueByStatus.map(status => {
+                const filteredQuotes = status.quotes.filter(quote => {
+                    const employeeMatch = selectedEmployee === 'all' || quote.createdBy.name === selectedEmployee;
+                    const clientMatch = selectedClient === 'all' || quote.client.company === selectedClient;
+                    return employeeMatch && clientMatch;
+                });
+
+                return {
+                    ...status,
+                    quotes: filteredQuotes,
+                    count: filteredQuotes.length,
+                    total: filteredQuotes.reduce((sum, quote) => sum + quote.amount, 0),
+                    avgQuoteValue: filteredQuotes.length ? 
+                        filteredQuotes.reduce((sum, quote) => sum + quote.amount, 0) / filteredQuotes.length : 0
+                };
+            });
         }
-        return filtered;
+
+        // Filter monthly data based on time range
+        if (selectedTimeRange !== 'month') {
+            const now = new Date();
+            const monthsToInclude = 
+                selectedTimeRange === 'week' ? 1 :
+                selectedTimeRange === 'quarter' ? 3 :
+                selectedTimeRange === 'year' ? 12 : 1;
+
+            filtered.salesByMonth = {
+                quotes: filtered.salesByMonth.quotes.filter(month => {
+                    const monthDate = new Date(month._id.year, month._id.month - 1);
+                    const diffMonths = (now.getFullYear() - monthDate.getFullYear()) * 12 + 
+                        (now.getMonth() - monthDate.getMonth());
+                    return diffMonths < monthsToInclude;
+                }),
+                deals: filtered.salesByMonth.deals.filter(month => {
+                    const monthDate = new Date(month._id.year, month._id.month - 1);
+                    const diffMonths = (now.getFullYear() - monthDate.getFullYear()) * 12 + 
+                        (now.getMonth() - monthDate.getMonth());
+                    return diffMonths < monthsToInclude;
+                })
+            };
+        }
+
+        setFilteredData(filtered);
+    }, [selectedEmployee, selectedClient, selectedTimeRange, salesData]);
+
+    // Format currency for tooltips and labels
+    const formatCurrency = (value) => {
+        if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
+        if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+        if (value >= 1000) return `$${(value / 1000).toFixed(1)}K`;
+        return `$${value}`;
     };
 
-    // Ensure we have data before rendering
-    if (!salesData) return null;
+    // Custom tooltip component
+    const CustomTooltip = ({ active, payload, label }) => {
+        if (active && payload && payload.length) {
+            return (
+                <div className="bg-white p-4 rounded-lg shadow-lg border">
+                    <p className="font-semibold">{label}</p>
+                    {payload.map((entry, index) => (
+                        <p key={index} style={{ color: entry.color }}>
+                            {entry.name}: {entry.value >= 1000 ? formatCurrency(entry.value) : entry.value}
+                        </p>
+                    ))}
+                </div>
+            );
+        }
+        return null;
+    };
 
     return (
         <div className="space-y-6">
@@ -379,43 +455,43 @@ const SalesAnalytics = ({ salesData }) => {
             {/* Charts Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Chart 1: Sales Funnel & Conversion */}
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
                     className="bg-white p-6 rounded-xl shadow-lg"
-                >
+            >
                     <h3 className="text-xl font-bold mb-6">Sales Funnel & Conversion</h3>
                     <div style={{ width: '100%', height: 400 }}>
-                        <ResponsiveContainer>
+                    <ResponsiveContainer>
                             <ComposedChart
-                                data={salesData.pipelineStages}
+                                data={filteredData.pipelineStages}
                                 margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
                             >
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis dataKey="_id" />
                                 <YAxis yAxisId="left" orientation="left" />
                                 <YAxis yAxisId="right" orientation="right" />
-                                <Tooltip />
+                                <Tooltip content={<CustomTooltip />} />
                                 <Legend />
                                 <Bar yAxisId="left" dataKey="count" fill="#8884d8" name="Number of Deals" />
                                 <Line yAxisId="right" type="monotone" dataKey="total" stroke="#82ca9d" name="Total Value" />
                             </ComposedChart>
-                        </ResponsiveContainer>
-                    </div>
-                </motion.div>
+                    </ResponsiveContainer>
+                </div>
+            </motion.div>
 
                 {/* Chart 2: Pipeline Distribution */}
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-white p-6 rounded-xl shadow-lg"
-                >
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white p-6 rounded-xl shadow-lg"
+            >
                     <h3 className="text-xl font-bold mb-6">Pipeline Distribution</h3>
                     <div style={{ width: '100%', height: 400 }}>
                         <ResponsiveContainer>
                             <PieChart>
                                 <Pie
-                                    data={salesData.pipelineStages}
+                                    data={filteredData.pipelineStages}
                                     dataKey="total"
                                     nameKey="_id"
                                     cx="50%"
@@ -424,7 +500,7 @@ const SalesAnalytics = ({ salesData }) => {
                                     fill="#8884d8"
                                     label
                                 >
-                                    {salesData.pipelineStages.map((entry, index) => (
+                                    {filteredData.pipelineStages.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                     ))}
                                 </Pie>
@@ -432,7 +508,7 @@ const SalesAnalytics = ({ salesData }) => {
                                 <Legend />
                             </PieChart>
                         </ResponsiveContainer>
-                    </div>
+                        </div>
                 </motion.div>
 
                 {/* Chart 3: Monthly Performance */}
@@ -443,47 +519,47 @@ const SalesAnalytics = ({ salesData }) => {
                 >
                     <h3 className="text-xl font-bold mb-6">Monthly Performance</h3>
                     <div style={{ width: '100%', height: 400 }}>
-                        <ResponsiveContainer>
-                            <AreaChart
-                                data={salesData.salesByMonth.deals}
-                                margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-                            >
-                                <CartesianGrid strokeDasharray="3 3" />
+                    <ResponsiveContainer>
+                        <AreaChart
+                                data={filteredData.salesByMonth.deals}
+                            margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                        >
+                            <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis dataKey="_id.month" />
-                                <YAxis />
-                                <Tooltip />
+                            <YAxis />
+                            <Tooltip />
                                 <Legend />
                                 <Area type="monotone" dataKey="total" stroke="#8884d8" fill="#8884d8" name="Total Value" />
                                 <Area type="monotone" dataKey="count" stroke="#82ca9d" fill="#82ca9d" name="Deal Count" />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-                </motion.div>
+                        </AreaChart>
+                    </ResponsiveContainer>
+                </div>
+            </motion.div>
 
                 {/* Chart 4: Quote Analysis */}
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-white p-6 rounded-xl shadow-lg"
-                >
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white p-6 rounded-xl shadow-lg"
+            >
                     <h3 className="text-xl font-bold mb-6">Quote Analysis</h3>
                     <div style={{ width: '100%', height: 400 }}>
-                        <ResponsiveContainer>
-                            <BarChart
-                                data={salesData.quoteValueByStatus}
-                                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                            >
-                                <CartesianGrid strokeDasharray="3 3" />
+                    <ResponsiveContainer>
+                        <BarChart
+                                data={filteredData.quoteValueByStatus}
+                            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                        >
+                            <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis dataKey="_id" />
                                 <YAxis />
                                 <Tooltip />
-                                <Legend />
+                            <Legend />
                                 <Bar dataKey="total" fill="#8884d8" name="Total Value" />
                                 <Bar dataKey="count" fill="#82ca9d" name="Number of Quotes" />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                </motion.div>
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            </motion.div>
             </div>
 
             {/* KPI Summary Cards */}
@@ -494,9 +570,11 @@ const SalesAnalytics = ({ salesData }) => {
                 >
                     <h4 className="text-lg font-semibold">Total Pipeline Value</h4>
                     <p className="text-3xl font-bold text-blue-600">
-                        ${(salesData.pipelineStages.reduce((acc, stage) => acc + stage.total, 0)/1000).toFixed(1)}k
+                        {formatCurrency(filteredData.pipelineStages.reduce((acc, stage) => acc + stage.total, 0))}
                     </p>
-                    <p className="text-sm text-gray-500">Across {salesData.pipelineStages.reduce((acc, stage) => acc + stage.count, 0)} deals</p>
+                    <p className="text-sm text-gray-500">
+                        Across {filteredData.pipelineStages.reduce((acc, stage) => acc + stage.count, 0)} deals
+                    </p>
                 </motion.div>
 
                 <motion.div
@@ -505,19 +583,19 @@ const SalesAnalytics = ({ salesData }) => {
                 >
                     <h4 className="text-lg font-semibold">Average Deal Size</h4>
                     <p className="text-3xl font-bold text-green-600">
-                        ${(salesData.pipelineStages.reduce((acc, stage) => acc + stage.avgDealSize, 0)/salesData.pipelineStages.length/1000).toFixed(1)}k
+                        {formatCurrency(filteredData.pipelineStages.reduce((acc, stage) => acc + stage.avgDealSize, 0))}
                     </p>
                     <p className="text-sm text-gray-500">Per closed deal</p>
                 </motion.div>
 
-                <motion.div
+            <motion.div
                     whileHover={{ scale: 1.02 }}
                     className="bg-white p-4 rounded-xl shadow-lg"
                 >
                     <h4 className="text-lg font-semibold">Win Rate</h4>
                     <p className="text-3xl font-bold text-purple-600">
-                        {((salesData.pipelineStages.find(stage => stage._id === 'Closed Won')?.count || 0) / 
-                        salesData.pipelineStages.reduce((acc, stage) => acc + stage.count, 0) * 100).toFixed(1)}%
+                        {((filteredData.pipelineStages.find(stage => stage._id === 'Closed Won')?.count || 0) / 
+                        filteredData.pipelineStages.reduce((acc, stage) => acc + stage.count, 0) * 100).toFixed(1)}%
                     </p>
                     <p className="text-sm text-gray-500">Overall conversion</p>
                 </motion.div>
@@ -528,10 +606,10 @@ const SalesAnalytics = ({ salesData }) => {
                 >
                     <h4 className="text-lg font-semibold">Active Quotes</h4>
                     <p className="text-3xl font-bold text-orange-600">
-                        {salesData.quoteValueByStatus[0].count}
+                        {filteredData.quoteValueByStatus[0].count}
                     </p>
-                    <p className="text-sm text-gray-500">Total value: ${(salesData.quoteValueByStatus[0].total/1000000).toFixed(1)}M</p>
-                </motion.div>
+                    <p className="text-sm text-gray-500">Total value: {formatCurrency(filteredData.quoteValueByStatus[0].total)}</p>
+            </motion.div>
             </div>
         </div>
     );
