@@ -402,7 +402,7 @@ router.post('/sales', validateIds, async (req, res) => {
         const quoteToDeal = quoteStats.length > 0 
             ? (quoteStats[0].acceptedQuotes / quoteStats[0].totalQuotes) * 100 
             : 0;
-
+        
         // Enhanced pipeline stage distribution with more details
         const pipelineStages = await Pipeline.aggregate([
             { $match: { organization: organization._id } },

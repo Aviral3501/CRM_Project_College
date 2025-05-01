@@ -260,12 +260,12 @@ const Analytics = () => {
             {isLoading ? (
                 <div className="flex items-center justify-center h-64">
                     <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
-                </div>
+                                </div>
             ) : projectData ? (
                 <div className="bg-gray-50 rounded-xl p-6">
                     <h2 className="text-xl font-bold mb-6">Project Analytics</h2>
                     <ProjectAnalytics projectData={projectData} />
-                </div>
+                            </div>
             ) : null}
 
 
@@ -590,7 +590,7 @@ const SalesAnalytics = ({ salesData }) => {
                         {formatCurrency(filteredData.pipelineStages.reduce((acc, stage) => acc + stage.avgDealSize, 0))}
                     </p>
                     <p className="text-sm text-gray-500">Per closed deal</p>
-                </motion.div>
+            </motion.div>
 
             <motion.div
                     whileHover={{ scale: 1.02 }}
@@ -633,10 +633,10 @@ const ProjectAnalytics = ({ projectData }) => {
                             {`${entry.name}: ${entry.value}${entry.name.includes('Rate') ? '%' : ''}`}
                         </p>
                     ))}
-                </div>
-            );
-        }
-        return null;
+                                            </div>
+                                        );
+                                    }
+                                    return null;
     };
 
     // Chart 1: Project Progress Matrix
@@ -796,9 +796,9 @@ const ProjectAnalytics = ({ projectData }) => {
                         />
                         <Tooltip content={<CustomTooltip />} />
                     </RadialBarChart>
-                </ResponsiveContainer>
-            </div>
-        </motion.div>
+                    </ResponsiveContainer>
+                </div>
+            </motion.div>
     );
 
     return (

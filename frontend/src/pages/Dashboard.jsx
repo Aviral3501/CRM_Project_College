@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import Card  from "../components/ui/Card"
-import {  DollarSign, Users, Briefcase } from 'lucide-react';
+import {  DollarSign, Users, Briefcase, CheckCircle } from 'lucide-react';
 import {  LineChart, TrendingUp } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import {
     ComposedChart, ScatterChart, Scatter, RadarChart, Radar, PolarGrid,
     PolarAngleAxis, PolarRadiusAxis, Cell, Line ,ResponsiveContainer, PieChart, Pie,
@@ -18,6 +19,7 @@ const Dashboard = () => {
     const [dashboardData, setDashboardData] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const { userData, BASE_URL } = useUser();
+    const navigate = useNavigate();
     // Demo data
     const stats = [
         {
@@ -46,50 +48,181 @@ const Dashboard = () => {
         }
     ];
 
-            // Fetch dashboard analytics data
-            useEffect(() => {
-                const fetchDashboardAnalytics = async () => {
-                    try {
-                        setIsLoading(true);
-                        const response = await axios.post(`${BASE_URL}/analytics/dashboard`, {
-                            organization_id: userData.organization_id,
-                            user_id: userData.user_id
-                        });
-        
-                        if (response.data.success) {
-                            setDashboardData(response.data.data);
-                        } else {
-                            toast.error('Failed to fetch dashboard analytics');
-                        }
-                    } catch (error) {
-                        console.error('Error fetching dashboard analytics:', error);
-                        toast.error('Error loading dashboard analytics');
-                    } finally {
-                        setIsLoading(false);
-                    }
-                };
-        
-                if (userData.organization_id && userData.user_id) {
-                    fetchDashboardAnalytics();
+    const quickActions = [
+        {
+            title: "Create New Lead",
+            path: "/sales/leads",
+            icon: "➕👥",
+            bgColor: "bg-blue-50",
+            hoverColor: "hover:bg-blue-100"
+        },
+        {
+            title: "Add New Customer",
+            path: "/sales/customers",
+            icon: "➕👤",
+            bgColor: "bg-green-50",
+            hoverColor: "hover:bg-green-100"
+        },
+        {
+            title: "Create New Quote",
+            path: "/sales/quotes",
+            icon: "➕📄",
+            bgColor: "bg-purple-50",
+            hoverColor: "hover:bg-purple-100"
+        },
+        {
+            title: "Add New Project",
+            path: "/projects",
+            icon: "➕📊",
+            bgColor: "bg-orange-50",
+            hoverColor: "hover:bg-orange-100"
+        },
+        {
+            title: "Assign New Task",
+            path: "/tasks",
+            icon: "➕✓",
+            bgColor: "bg-yellow-50",
+            hoverColor: "hover:bg-yellow-100"
+        },
+        {
+            title: "View Analytics",
+            path: "/analytics",
+            icon: "📈",
+            bgColor: "bg-indigo-50",
+            hoverColor: "hover:bg-indigo-100"
+        }
+    ];
+
+    // Fetch dashboard analytics data
+    useEffect(() => {
+        const fetchDashboardAnalytics = async () => {
+            try {
+                setIsLoading(true);
+                const response = await axios.post(`${BASE_URL}/analytics/dashboard`, {
+                    organization_id: userData.organization_id,
+                    user_id: userData.user_id
+                });
+    
+                if (response.data.success) {
+                    setDashboardData(response.data.data);
+                } else {
+                    toast.error('Failed to fetch dashboard analytics');
                 }
-            }, [userData.organization_id, userData.user_id, BASE_URL]);
+            } catch (error) {
+                console.error('Error fetching dashboard analytics:', error);
+                toast.error('Error loading dashboard analytics');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+    
+        if (userData.organization_id && userData.user_id) {
+            fetchDashboardAnalytics();
+        }
+    }, [userData.organization_id, userData.user_id, BASE_URL]);
+
+    // Format currency values
+    const formatCurrency = (value) => {
+        if (value >= 1000000000) {
+            return `$${(value / 1000000000).toFixed(1)}B`;
+        } else if (value >= 1000000) {
+            return `$${(value / 1000000).toFixed(1)}M`;
+        } else if (value >= 1000) {
+            return `$${(value / 1000).toFixed(1)}K`;
+        }
+        return `$${value}`;
+    };
+
+    // Calculate conversion rate
+    const calculateConversionRate = () => {
+        if (!dashboardData) return 0;
+        const converted = dashboardData.statusDistribution.leads.find(s => s._id === 'Converted')?.count || 0;
+        const total = dashboardData.counts.leads;
+        return total ? ((converted / total) * 100).toFixed(1) : 0;
+    };
+
+    // Get win rate from pipeline
+    const calculateWinRate = () => {
+        if (!dashboardData) return 0;
+        const won = dashboardData.statusDistribution.pipeline.find(s => s._id === 'Closed Won')?.count || 0;
+        const total = dashboardData.counts.pipeline;
+        return total ? ((won / total) * 100).toFixed(1) : 0;
+    };
+
+    const dashboardCards = [
+        {
+            title: "Total Pipeline Value",
+            value: dashboardData ? formatCurrency(dashboardData.totalValues.pipeline) : '$0',
+            change: `${calculateWinRate()}% Win Rate`,
+            icon: <DollarSign className="text-green-500" size={24} />,
+            onClick: () => navigate('/sales/pipeline'),
+            bgColor: "bg-green-50",
+            textColor: "text-green-600"
+        },
+        {
+            title: "Active Projects",
+            value: dashboardData?.counts.projects || 0,
+            change: `${dashboardData?.statusDistribution.projects.find(s => s._id === 'In Progress')?.count || 0} In Progress`,
+            icon: <Briefcase className="text-blue-500" size={24} />,
+            onClick: () => navigate('/projects'),
+            bgColor: "bg-blue-50",
+            textColor: "text-blue-600"
+        },
+        {
+            title: "Lead Conversion",
+            value: `${calculateConversionRate()}%`,
+            change: `${dashboardData?.counts.leads || 0} Total Leads`,
+            icon: <Users className="text-purple-500" size={24} />,
+            onClick: () => navigate('/sales/leads'),
+            bgColor: "bg-purple-50",
+            textColor: "text-purple-600"
+        },
+        {
+            title: "Task Completion",
+            value: dashboardData ? `${((dashboardData.statusDistribution.tasks.find(s => s._id === 'Completed')?.count || 0) / 
+                                    dashboardData.counts.tasks * 100).toFixed(1)}%` : '0%',
+            change: `${dashboardData?.counts.tasks || 0} Total Tasks`,
+            icon: <CheckCircle className="text-orange-500" size={24} />,
+            onClick: () => navigate('/tasks'),
+            bgColor: "bg-orange-50",
+            textColor: "text-orange-600"
+        }
+    ];
 
     return (
         <div>
             <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                {stats.map((stat, index) => (
-                    <Card key={index} className="p-6">
+                {dashboardCards.map((card, index) => (
+                    <motion.div
+                        key={index}
+                        whileHover={{ scale: 1.02 }}
+                        className={`${card.bgColor} p-6 rounded-xl shadow-lg cursor-pointer`}
+                        onClick={card.onClick}
+                    >
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-gray-500 font-medium">{stat.title}</h3>
-                            {stat.icon}
+                            <h3 className="text-gray-700 font-medium">{card.title}</h3>
+                            {card.icon}
                         </div>
-                        <div className="flex items-baseline">
-                            <p className="text-2xl font-semibold">{stat.value}</p>
-                            <span className="ml-2 text-sm text-green-500">{stat.change}</span>
+                        <div className="flex flex-col">
+                            <p className={`text-2xl font-bold ${card.textColor}`}>
+                                {card.value}
+                            </p>
+                            <span className="mt-2 text-sm text-gray-600">
+                                {card.change}
+                            </span>
                         </div>
-                    </Card>
+                        <div className={`h-1 w-full bg-${card.textColor} bg-opacity-20 rounded-full mt-4`}>
+                            <div 
+                                className={`h-1 ${card.textColor} rounded-full`}
+                                style={{ 
+                                    width: card.value.toString().includes('%') ? 
+                                        card.value : '100%' 
+                                }}
+                            ></div>
+                        </div>
+                    </motion.div>
                 ))}
             </div>
 
@@ -97,33 +230,104 @@ const Dashboard = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card className="p-6">
                     <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
-                    <div className="space-y-2">
-                        <button className="w-full text-left p-3 rounded bg-gray-50 hover:bg-gray-100">
-                            Create New Lead
-                        </button>
-                        <button className="w-full text-left p-3 rounded bg-gray-50 hover:bg-gray-100">
-                            Add New Project
-                        </button>
-                        <button className="w-full text-left p-3 rounded bg-gray-50 hover:bg-gray-100">
-                            Schedule Meeting
-                        </button>
+                    <div className="grid grid-cols-1 gap-3">
+                        {quickActions.map((action, index) => (
+                            <button
+                                key={index}
+                                onClick={() => navigate(action.path)}
+                                className={`w-full text-left p-4 rounded ${action.bgColor} ${action.hoverColor} 
+                                          transition-all duration-300 flex items-center space-x-3 group`}
+                            >
+                                <span className="text-xl group-hover:scale-110 transition-transform duration-300">
+                                    {action.icon}
+                                </span>
+                                <span className="font-medium">{action.title}</span>
+                            </button>
+                        ))}
                     </div>
                 </Card>
 
                 <Card className="p-6">
-                    <h2 className="text-xl font-semibold mb-4">Recent Activity</h2>
+                    <h2 className="text-xl font-semibold mb-4">Performance Highlights</h2>
                     <div className="space-y-4">
-                        <div className="flex items-center gap-4">
-                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                            <p className="text-sm">New lead assigned to John Doe</p>
+                        {/* Lead Conversion Highlight */}
+                        <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                                    <Users className="text-green-600" size={20} />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium text-gray-800">Lead Conversion</p>
+                                    <p className="text-xs text-gray-600">
+                                        {dashboardData?.statusDistribution.leads.find(s => s._id === 'Converted')?.count || 0} converted leads
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-lg font-bold text-green-600">{calculateConversionRate()}%</p>
+                                <p className="text-xs text-gray-600">conversion rate</p>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-4">
-                            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                            <p className="text-sm">Project "Website Redesign" completed</p>
+
+                        {/* Pipeline Value Highlight */}
+                        <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                    <DollarSign className="text-blue-600" size={20} />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium text-gray-800">Pipeline Value</p>
+                                    <p className="text-xs text-gray-600">
+                                        {dashboardData?.counts.pipeline || 0} opportunities
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-lg font-bold text-blue-600">{formatCurrency(dashboardData?.totalValues.pipeline || 0)}</p>
+                                <p className="text-xs text-gray-600">total value</p>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-4">
-                            <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-                            <p className="text-sm">Meeting scheduled with Client XYZ</p>
+
+                        {/* Task Progress Highlight */}
+                        <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                                    <CheckCircle className="text-purple-600" size={20} />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium text-gray-800">Task Progress</p>
+                                    <p className="text-xs text-gray-600">
+                                        {dashboardData?.statusDistribution.tasks.find(s => s._id === 'Completed')?.count || 0} of {dashboardData?.counts.tasks || 0} completed
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-lg font-bold text-purple-600">
+                                    {dashboardData ? 
+                                        `${((dashboardData.statusDistribution.tasks.find(s => s._id === 'Completed')?.count || 0) / 
+                                        dashboardData.counts.tasks * 100).toFixed(1)}%` : '0%'}
+                                </p>
+                                <p className="text-xs text-gray-600">completion rate</p>
+                            </div>
+                        </div>
+
+                        {/* Quote Success Highlight */}
+                        <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+                                    <TrendingUp className="text-orange-600" size={20} />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium text-gray-800">Quote Value</p>
+                                    <p className="text-xs text-gray-600">
+                                        {dashboardData?.counts.quotes || 0} total quotes
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-lg font-bold text-orange-600">{formatCurrency(dashboardData?.totalValues.quotes || 0)}</p>
+                                <p className="text-xs text-gray-600">total value</p>
+                            </div>
                         </div>
                     </div>
                 </Card>
@@ -141,7 +345,7 @@ const Dashboard = () => {
                 </div>
             ) : null}
 
-            
+
         </div>
     );
 };
