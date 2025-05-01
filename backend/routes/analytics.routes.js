@@ -341,7 +341,7 @@ router.post('/sales', validateIds, async (req, res) => {
                 message: 'Organization not found'
             });
         }
-
+        
         // Calculate conversion rates
         const [leadStats, quoteStats] = await Promise.all([
             // Lead to Customer conversion
@@ -686,58 +686,408 @@ router.post('/sales', validateIds, async (req, res) => {
  */
 router.post('/projects', validateIds, async (req, res) => {
     try {
-        const { organization_id, startDate, endDate } = req.body;
-        
-        // Set default date range if not provided (last 30 days)
-        const end = endDate ? new Date(endDate) : new Date();
-        const start = startDate ? new Date(startDate) : new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
-        
-        // Find organization
+        const { organization_id } = req.body;
         const organization = await Organization.findOne({ org_id: organization_id });
-        if (!organization) {
-            return res.status(404).json({
-                success: false,
-                message: 'Organization not found'
-            });
-        }
-        
-        // Get project status distribution
-        const projectStatusDistribution = await Project.aggregate([
+
+        // Enhanced project details with team members, tasks, and milestones
+        const detailedProjects = await Project.aggregate([
             { $match: { organization: organization._id } },
-            { $group: { _id: '$status', count: { $sum: 1 } } },
-            { $sort: { count: -1 } }
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'teamMembers',
+                    foreignField: '_id',
+                    as: 'teamDetails'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'tasks',
+                    localField: '_id',
+                    foreignField: 'project',
+                    as: 'projectTasks'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'milestones',
+                    localField: '_id',
+                    foreignField: 'project',
+                    as: 'milestones'
+                }
+            },
+            {
+                $project: {
+                    project_id: 1,
+                    name: 1,
+                    description: 1,
+                    status: 1,
+                    priority: 1,
+                    startDate: 1,
+                    deadline: 1,
+                    completionDate: 1,
+                    budget: 1,
+                    actualCost: 1,
+                    progress: {
+                        $multiply: [
+                            {
+                                $divide: [
+                                    { 
+                                        $size: {
+                                            $filter: {
+                                                input: '$projectTasks',
+                                                as: 'task',
+                                                cond: { $eq: ['$$task.status', 'Completed'] }
+                                            }
+                                        }
+                                    },
+                                    { $max: [{ $size: '$projectTasks' }, 1] }
+                                ]
+                            },
+                            100
+                        ]
+                    },
+                    team: {
+                        $map: {
+                            input: '$teamDetails',
+                            as: 'member',
+                            in: {
+                                _id: '$$member._id',
+                                name: '$$member.name',
+                                role: '$$member.role',
+                                department: '$$member.department',
+                                tasksAssigned: {
+                                    $size: {
+                                        $filter: {
+                                            input: '$projectTasks',
+                                            as: 'task',
+                                            cond: { $eq: ['$$task.assignedTo', '$$member._id'] }
+                                        }
+                                    }
+                                },
+                                tasksCompleted: {
+                                    $size: {
+                                        $filter: {
+                                            input: '$projectTasks',
+                                            as: 'task',
+                                            cond: { 
+                                                $and: [
+                                                    { $eq: ['$$task.assignedTo', '$$member._id'] },
+                                                    { $eq: ['$$task.status', 'Completed'] }
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    taskAnalytics: {
+                        total: { $size: '$projectTasks' },
+                        byStatus: {
+                            notStarted: {
+                                $size: {
+                                    $filter: {
+                                        input: '$projectTasks',
+                                        as: 'task',
+                                        cond: { $eq: ['$$task.status', 'Not Started'] }
+                                    }
+                                }
+                            },
+                            inProgress: {
+                                $size: {
+                                    $filter: {
+                                        input: '$projectTasks',
+                                        as: 'task',
+                                        cond: { $eq: ['$$task.status', 'In Progress'] }
+                                    }
+                                }
+                            },
+                            completed: {
+                                $size: {
+                                    $filter: {
+                                        input: '$projectTasks',
+                                        as: 'task',
+                                        cond: { $eq: ['$$task.status', 'Completed'] }
+                                    }
+                                }
+                            }
+                        },
+                        byPriority: {
+                            low: {
+                                $size: {
+                                    $filter: {
+                                        input: '$projectTasks',
+                                        as: 'task',
+                                        cond: { $eq: ['$$task.priority', 'Low'] }
+                                    }
+                                }
+                            },
+                            medium: {
+                                $size: {
+                                    $filter: {
+                                        input: '$projectTasks',
+                                        as: 'task',
+                                        cond: { $eq: ['$$task.priority', 'Medium'] }
+                                    }
+                                }
+                            },
+                            high: {
+                                $size: {
+                                    $filter: {
+                                        input: '$projectTasks',
+                                        as: 'task',
+                                        cond: { $eq: ['$$task.priority', 'High'] }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    milestoneProgress: {
+                        total: { $size: '$milestones' },
+                        completed: {
+                            $size: {
+                                $filter: {
+                                    input: '$milestones',
+                                    as: 'milestone',
+                                    cond: { $eq: ['$$milestone.status', 'Completed'] }
+                                }
+                            }
+                        },
+                        upcoming: {
+                            $filter: {
+                                input: '$milestones',
+                                as: 'milestone',
+                                cond: { 
+                                    $and: [
+                                        { $gt: ['$$milestone.dueDate', new Date()] },
+                                        { $ne: ['$$milestone.status', 'Completed'] }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    timeMetrics: {
+                        totalDuration: {
+                            $divide: [
+                                { $subtract: ['$deadline', '$startDate'] },
+                                (1000 * 60 * 60 * 24) // Convert to days
+                            ]
+                        },
+                        daysRemaining: {
+                            $divide: [
+                                { $subtract: ['$deadline', new Date()] },
+                                (1000 * 60 * 60 * 24)
+                            ]
+                        },
+                        isOverdue: {
+                            $and: [
+                                { $lt: ['$deadline', new Date()] },
+                                { $ne: ['$status', 'Completed'] }
+                            ]
+                        }
+                    }
+                }
+            }
         ]);
-        
-        // Get project priority distribution
-        const projectPriorityDistribution = await Project.aggregate([
+
+        // Enhanced resource allocation metrics
+        const resourceMetrics = await Task.aggregate([
             { $match: { organization: organization._id } },
-            { $group: { _id: '$priority', count: { $sum: 1 } } },
-            { $sort: { count: -1 } }
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'assignedTo',
+                    foreignField: '_id',
+                    as: 'assigneeDetails'
+                }
+            },
+            {
+                $group: {
+                    _id: {
+                        userId: { $arrayElemAt: ['$assigneeDetails._id', 0] },
+                        userName: { $arrayElemAt: ['$assigneeDetails.name', 0] },
+                        userRole: { $arrayElemAt: ['$assigneeDetails.role', 0] }
+                    },
+                    totalTasks: { $sum: 1 },
+                    notStartedTasks: {
+                        $sum: { $cond: [{ $eq: ['$status', 'Not Started'] }, 1, 0] }
+                    },
+                    inProgressTasks: {
+                        $sum: { $cond: [{ $eq: ['$status', 'In Progress'] }, 1, 0] }
+                    },
+                    completedTasks: {
+                        $sum: { $cond: [{ $eq: ['$status', 'Completed'] }, 1, 0] }
+                    },
+                    lowPriorityTasks: {
+                        $sum: { $cond: [{ $eq: ['$priority', 'Low'] }, 1, 0] }
+                    },
+                    mediumPriorityTasks: {
+                        $sum: { $cond: [{ $eq: ['$priority', 'Medium'] }, 1, 0] }
+                    },
+                    highPriorityTasks: {
+                        $sum: { $cond: [{ $eq: ['$priority', 'High'] }, 1, 0] }
+                    },
+                    onTimeCompletions: {
+                        $sum: {
+                            $cond: [
+                                { 
+                                    $and: [
+                                        { $eq: ['$status', 'Completed'] },
+                                        { $lte: ['$completedAt', '$dueDate'] }
+                                    ]
+                                },
+                                1,
+                                0
+                            ]
+                        }
+                    },
+                    upcomingTasks: {
+                        $push: {
+                            $cond: [
+                                { 
+                                    $and: [
+                                        { $gt: ['$dueDate', new Date()] },
+                                        { $lt: ['$dueDate', new Date(new Date().setDate(new Date().getDate() + 7))] }
+                                    ]
+                                },
+                                {
+                                    taskId: '$_id',
+                                    title: '$title',
+                                    dueDate: '$dueDate',
+                                    priority: '$priority'
+                                },
+                                null
+                            ]
+                        }
+                    }
+                }
+            },
+            {
+                $project: {
+                    _id: 1,
+                    userName: '$_id.userName',
+                    userRole: '$_id.userRole',
+                    workload: {
+                        total: '$totalTasks',
+                        byStatus: {
+                            notStarted: '$notStartedTasks',
+                            inProgress: '$inProgressTasks',
+                            completed: '$completedTasks'
+                        },
+                        byPriority: {
+                            low: '$lowPriorityTasks',
+                            medium: '$mediumPriorityTasks',
+                            high: '$highPriorityTasks'
+                        }
+                    },
+                    performance: {
+                        completionRate: {
+                            $cond: [
+                                { $eq: ['$totalTasks', 0] },
+                                0,
+                                {
+                                    $multiply: [
+                                        { $divide: ['$completedTasks', '$totalTasks'] },
+                                        100
+                                    ]
+                                }
+                            ]
+                        },
+                        onTimeCompletion: {
+                            $cond: [
+                                { $eq: ['$completedTasks', 0] },
+                                0,
+                                {
+                                    $multiply: [
+                                        { $divide: ['$onTimeCompletions', '$completedTasks'] },
+                                        100
+                                    ]
+                                }
+                            ]
+                        }
+                    },
+                    upcomingTasks: {
+                        $filter: {
+                            input: '$upcomingTasks',
+                            as: 'task',
+                            cond: { $ne: ['$$task', null] }
+                        }
+                    }
+                }
+            }
         ]);
-        
-        // Get task status distribution
-        const taskStatusDistribution = await Task.aggregate([
+
+        // Keep existing aggregations and add new ones
+        res.json({
+            success: true,
+            data: {
+                projectDetails: detailedProjects,
+                resourceMetrics,
+                projectStatusDistribution: await Project.aggregate([
             { $match: { organization: organization._id } },
-            { $group: { _id: '$status', count: { $sum: 1 } } },
+                    { 
+                        $group: { 
+                            _id: '$status',
+                            count: { $sum: 1 },
+                            totalBudget: { $sum: '$budget' },
+                            averageProgress: { $avg: '$progress' }
+                        }
+                    },
             { $sort: { count: -1 } }
-        ]);
-        
-        // Get task priority distribution
-        const taskPriorityDistribution = await Task.aggregate([
+                ]),
+                projectPriorityDistribution: await Project.aggregate([
             { $match: { organization: organization._id } },
-            { $group: { _id: '$priority', count: { $sum: 1 } } },
+                    { 
+                        $group: { 
+                            _id: '$priority',
+                            count: { $sum: 1 },
+                            averageCompletion: { $avg: '$progress' },
+                            totalTasks: { $sum: { $size: '$tasks' } }
+                        }
+                    },
             { $sort: { count: -1 } }
-        ]);
-        
-        // Get projects by month (last 12 months)
-        const twelveMonthsAgo = new Date();
-        twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-        
-        const projectsByMonth = await Project.aggregate([
+                ]),
+                taskMetrics: {
+                    statusDistribution: await Task.aggregate([
+                        { $match: { organization: organization._id } },
+                        { 
+                            $group: { 
+                                _id: '$status',
+                                count: { $sum: 1 },
+                                averageCompletionTime: {
+                                    $avg: {
+                                        $cond: [
+                                            { $eq: ['$status', 'Completed'] },
+                                            { $subtract: ['$completedAt', '$createdAt'] },
+                                            null
+                                        ]
+                                    }
+                                }
+                            }
+                        },
+                        { $sort: { count: -1 } }
+                    ]),
+                    priorityDistribution: await Task.aggregate([
+                        { $match: { organization: organization._id } },
+                        { 
+                            $group: { 
+                                _id: '$priority',
+                                count: { $sum: 1 },
+                                completedCount: {
+                                    $sum: { $cond: [{ $eq: ['$status', 'Completed'] }, 1, 0] }
+                                }
+                            }
+                        },
+                        { $sort: { count: -1 } }
+                    ])
+                },
+                timelineMetrics: {
+                    projectsByMonth: await Project.aggregate([
             { 
                 $match: { 
                     organization: organization._id,
-                    createdAt: { $gte: twelveMonthsAgo }
+                                createdAt: { $gte: new Date(new Date().setMonth(new Date().getMonth() - 12)) }
                 } 
             },
             { 
@@ -747,22 +1097,18 @@ router.post('/projects', validateIds, async (req, res) => {
                         month: { $month: '$createdAt' }
                     },
                     count: { $sum: 1 },
-                    completed: { 
-                        $sum: { 
-                            $cond: [{ $eq: ['$status', 'Completed'] }, 1, 0] 
-                        } 
-                    }
+                                completed: { $sum: { $cond: [{ $eq: ['$status', 'Completed'] }, 1, 0] } },
+                                totalBudget: { $sum: '$budget' },
+                                averageProgress: { $avg: '$progress' }
                 } 
             },
             { $sort: { '_id.year': 1, '_id.month': 1 } }
-        ]);
-        
-        // Get tasks by month (last 12 months)
-        const tasksByMonth = await Task.aggregate([
+                    ]),
+                    tasksByMonth: await Task.aggregate([
             { 
                 $match: { 
                     organization: organization._id,
-                    createdAt: { $gte: twelveMonthsAgo }
+                                createdAt: { $gte: new Date(new Date().setMonth(new Date().getMonth() - 12)) }
                 } 
             },
             { 
@@ -772,21 +1118,35 @@ router.post('/projects', validateIds, async (req, res) => {
                         month: { $month: '$createdAt' }
                     },
                     count: { $sum: 1 },
-                    completed: { 
-                        $sum: { 
-                            $cond: [{ $eq: ['$status', 'Completed'] }, 1, 0] 
+                                completed: { $sum: { $cond: [{ $eq: ['$status', 'Completed'] }, 1, 0] } },
+                                averageCompletionTime: {
+                                    $avg: {
+                                        $cond: [
+                                            { $eq: ['$status', 'Completed'] },
+                                            { $subtract: ['$completedAt', '$createdAt'] },
+                                            null
+                                        ]
                         } 
                     }
                 } 
             },
             { $sort: { '_id.year': 1, '_id.month': 1 } }
-        ]);
-        
-        // Get projects by user (top performers)
-        const projectsByUser = await Project.aggregate([
+                    ])
+                },
+                performanceMetrics: {
+                    topPerformers: {
+                        projects: await Project.aggregate([
             { $match: { organization: organization._id } },
-            { $group: { _id: '$createdBy', count: { $sum: 1 } } },
-            { $sort: { count: -1 } },
+                            { 
+                                $group: { 
+                                    _id: '$createdBy',
+                                    count: { $sum: 1 },
+                                    completedProjects: { $sum: { $cond: [{ $eq: ['$status', 'Completed'] }, 1, 0] } },
+                                    totalBudget: { $sum: '$budget' },
+                                    averageProgress: { $avg: '$progress' }
+                                }
+                            },
+                            { $sort: { completedProjects: -1 } },
             { $limit: 5 },
             { 
                 $lookup: {
@@ -797,18 +1157,50 @@ router.post('/projects', validateIds, async (req, res) => {
                 }
             },
             { $unwind: '$user' },
-            { $project: { _id: 1, name: '$user.name', count: 1 } }
-        ]);
-        
-        // Get tasks by user (top performers)
-        const tasksByUser = await Task.aggregate([
+                            { 
+                                $project: { 
+                                    _id: 1,
+                                    name: '$user.name',
+                                    role: '$user.role',
+                                    metrics: {
+                                        totalProjects: '$count',
+                                        completedProjects: '$completedProjects',
+                                        successRate: {
+                                            $multiply: [
+                                                { $divide: ['$completedProjects', '$count'] },
+                                                100
+                                            ]
+                                        },
+                                        totalBudget: '$totalBudget',
+                                        averageProgress: '$averageProgress'
+                                    }
+                                }
+                            }
+                        ]),
+                        tasks: await Task.aggregate([
             { $match: { organization: organization._id } },
-            { $group: { _id: '$assignedTo', count: { $sum: 1 }, completed: { 
+                            { 
+                                $group: { 
+                                    _id: '$assignedTo',
+                                    totalTasks: { $sum: 1 },
+                                    completedTasks: { $sum: { $cond: [{ $eq: ['$status', 'Completed'] }, 1, 0] } },
+                                    onTimeTasks: {
                 $sum: { 
-                    $cond: [{ $eq: ['$status', 'Completed'] }, 1, 0] 
-                } 
-            } } },
-            { $sort: { completed: -1 } },
+                                            $cond: [
+                                                { 
+                                                    $and: [
+                                                        { $eq: ['$status', 'Completed'] },
+                                                        { $lte: ['$completedAt', '$dueDate'] }
+                                                    ]
+                                                },
+                                                1,
+                                                0
+                                            ]
+                                        }
+                                    }
+                                }
+                            },
+                            { $sort: { completedTasks: -1 } },
             { $limit: 5 },
             { 
                 $lookup: {
@@ -819,18 +1211,39 @@ router.post('/projects', validateIds, async (req, res) => {
                 }
             },
             { $unwind: '$user' },
-            { $project: { _id: 1, name: '$user.name', count: 1, completed: 1 } }
-        ]);
-        
-        // Get overdue tasks
-        const overdueTasks = await Task.countDocuments({
+                            { 
+                                $project: { 
+                                    _id: 1,
+                                    name: '$user.name',
+                                    role: '$user.role',
+                                    metrics: {
+                                        totalTasks: '$totalTasks',
+                                        completedTasks: '$completedTasks',
+                                        completionRate: {
+                                            $multiply: [
+                                                { $divide: ['$completedTasks', '$totalTasks'] },
+                                                100
+                                            ]
+                                        },
+                                        onTimeCompletion: {
+                                            $multiply: [
+                                                { $divide: ['$onTimeTasks', '$completedTasks'] },
+                                                100
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        ])
+                    }
+                },
+                riskMetrics: {
+                    overdueTasks: await Task.countDocuments({
             organization: organization._id,
             dueDate: { $lt: new Date() },
             status: { $ne: 'Completed' }
-        });
-        
-        // Get upcoming deadlines (next 7 days)
-        const upcomingDeadlines = await Project.find({
+                    }),
+                    upcomingDeadlines: await Project.find({
             organization: organization._id,
             deadline: { 
                 $gte: new Date(),
@@ -838,25 +1251,10 @@ router.post('/projects', validateIds, async (req, res) => {
             },
             status: { $ne: 'Completed' }
         })
-        .select('name deadline status priority')
+                    .select('name deadline status priority progress budget')
         .sort({ deadline: 1 })
-        .limit(10);
-        
-        res.json({
-            success: true,
-            data: {
-                projectStatusDistribution,
-                projectPriorityDistribution,
-                taskStatusDistribution,
-                taskPriorityDistribution,
-                projectsByMonth,
-                tasksByMonth,
-                topPerformers: {
-                    projects: projectsByUser,
-                    tasks: tasksByUser
-                },
-                overdueTasks,
-                upcomingDeadlines
+                    .limit(10)
+                }
             }
         });
     } catch (error) {

@@ -19,6 +19,36 @@ const Analytics = () => {
     const [dashboardData, setDashboardData] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const { userData, BASE_URL } = useUser();
+    const [projectData, setProjectData] = useState(null);
+
+        // Add this new useEffect for fetching project data
+        useEffect(() => {
+            const fetchProjectAnalytics = async () => {
+                try {
+                    setIsLoading(true);
+                    const response = await axios.post(`${BASE_URL}/analytics/projects`, {
+                        organization_id: userData.organization_id,
+                        user_id: userData.user_id
+                    });
+    
+                    if (response.data.success) {
+                        console.log('Project Analytics Data:', response.data.data);
+                        setProjectData(response.data.data);
+                    } else {
+                        toast.error('Failed to fetch project analytics');
+                    }
+                } catch (error) {
+                    console.error('Error fetching project analytics:', error);
+                    toast.error('Error loading project analytics');
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+    
+            if (userData?.organization_id && userData?.user_id) {
+                fetchProjectAnalytics();
+            }
+        }, [userData?.organization_id, userData?.user_id, BASE_URL]);
 
     // Format currency values
     const formatCurrency = (value) => {
@@ -227,47 +257,21 @@ const Analytics = () => {
                 </div>
             ) : null}
 
-            
-           
+            {isLoading ? (
+                <div className="flex items-center justify-center h-64">
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
+                </div>
+            ) : projectData ? (
+                <div className="bg-gray-50 rounded-xl p-6">
+                    <h2 className="text-xl font-bold mb-6">Project Analytics</h2>
+                    <ProjectAnalytics projectData={projectData} />
+                </div>
+            ) : null}
 
-            {/* Activity and Performance Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card className="p-6">
-                    <h2 className="text-lg font-semibold mb-4">Recent Activities</h2>
-                    <div className="space-y-4">
-                        {!isLoading && dashboardData && getRecentActivities().map((activity, index) => (
-                            <div key={index} className="flex items-start gap-4">
-                                <div className={`w-2 h-2 mt-2 rounded-full ${
-                                    activity.type === 'Lead' ? 'bg-blue-500' :
-                                    activity.type === 'Quote' ? 'bg-green-500' : 'bg-purple-500'
-                                }`}></div>
-                                <div className="flex-1">
-                                    <p className="text-sm text-gray-600">{activity.message}</p>
-                                    <span className="text-xs text-gray-400">{activity.time}</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </Card>
 
-                <Card className="p-6">
-                    <h2 className="text-lg font-semibold mb-4">Performance Metrics</h2>
-                    <div className="space-y-4">
-                        {!isLoading && dashboardData && getPerformanceMetrics().map((metric, index) => (
-                            <div key={index} className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                                    <span>{metric.label}</span>
-                                    <span className="font-medium">{metric.value}%</span>
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                                    <div className={`bg-${metric.color}-500 h-2 rounded-full`} 
-                                         style={{ width: `${metric.value}%` }}></div>
-                            </div>
-                        </div>
-                        ))}
-                    </div>
-                </Card>
-            </div>
+
+
+          
 
 
         </div>
@@ -615,3 +619,245 @@ const SalesAnalytics = ({ salesData }) => {
     );
 };
 
+const ProjectAnalytics = ({ projectData }) => {
+    const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ffc658'];
+
+    // Custom tooltip component
+    const CustomTooltip = ({ active, payload, label }) => {
+        if (active && payload && payload.length) {
+            return (
+                <div className="bg-white p-4 rounded-lg shadow-lg border">
+                    <p className="font-semibold">{label}</p>
+                    {payload.map((entry, index) => (
+                        <p key={index} style={{ color: entry.color }}>
+                            {`${entry.name}: ${entry.value}${entry.name.includes('Rate') ? '%' : ''}`}
+                        </p>
+                    ))}
+                </div>
+            );
+        }
+        return null;
+    };
+
+    // Chart 1: Project Progress Matrix
+    const ProjectProgressMatrix = () => (
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white p-6 rounded-xl shadow-lg"
+        >
+            <h3 className="text-xl font-bold mb-6">Project Progress Matrix</h3>
+            <div style={{ width: '100%', height: 400 }}>
+                <ResponsiveContainer>
+                    <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                        <CartesianGrid />
+                        <XAxis 
+                            type="number" 
+                            dataKey="progress" 
+                            name="Progress" 
+                            unit="%" 
+                        />
+                        <YAxis 
+                            type="number" 
+                            dataKey="taskAnalytics.total" 
+                            name="Total Tasks" 
+                        />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Legend />
+                        {projectData.projectDetails.map((project, index) => (
+                            <Scatter 
+                                key={project._id}
+                                name={project.name}
+                                data={[{
+                                    progress: project.progress,
+                                    'taskAnalytics.total': project.taskAnalytics.total,
+                                    status: project.status,
+                                    priority: project.priority
+                                }]}
+                                fill={COLORS[index % COLORS.length]}
+                            />
+                        ))}
+                    </ScatterChart>
+                </ResponsiveContainer>
+            </div>
+        </motion.div>
+    );
+
+    // Chart 2: Task Distribution Analysis
+    const TaskDistributionAnalysis = () => (
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white p-6 rounded-xl shadow-lg"
+        >
+            <h3 className="text-xl font-bold mb-6">Task Distribution Analysis</h3>
+            <div style={{ width: '100%', height: 400 }}>
+                <ResponsiveContainer>
+                    <RadarChart outerRadius={150}>
+                        <PolarGrid />
+                        <PolarAngleAxis dataKey="_id" />
+                        <PolarRadiusAxis />
+                        <Radar
+                            name="Status"
+                            dataKey="count"
+                            data={projectData.taskMetrics.statusDistribution}
+                            fill="#8884d8"
+                            fillOpacity={0.6}
+                        />
+                        <Radar
+                            name="Priority"
+                            dataKey="count"
+                            data={projectData.taskMetrics.priorityDistribution}
+                            fill="#82ca9d"
+                            fillOpacity={0.6}
+                        />
+                        <Legend />
+                        <Tooltip content={<CustomTooltip />} />
+                    </RadarChart>
+                </ResponsiveContainer>
+            </div>
+        </motion.div>
+    );
+
+    // Chart 3: Project Timeline Performance
+    const ProjectTimelinePerformance = () => (
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white p-6 rounded-xl shadow-lg"
+        >
+            <h3 className="text-xl font-bold mb-6">Project Timeline Performance</h3>
+            <div style={{ width: '100%', height: 400 }}>
+                <ResponsiveContainer>
+                    <ComposedChart
+                        data={projectData.timelineMetrics.projectsByMonth}
+                        margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
+                    >
+                        <CartesianGrid stroke="#f5f5f5" />
+                        <XAxis 
+                            dataKey="_id.month" 
+                            label={{ value: 'Month', position: 'bottom' }} 
+                        />
+                        <YAxis yAxisId="left" label={{ value: 'Count', angle: -90, position: 'left' }} />
+                        <YAxis yAxisId="right" orientation="right" label={{ value: 'Progress %', angle: 90, position: 'right' }} />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Legend />
+                        <Bar yAxisId="left" dataKey="count" fill="#8884d8" name="Total Projects" />
+                        <Bar yAxisId="left" dataKey="completed" fill="#82ca9d" name="Completed" />
+                        <Line yAxisId="right" type="monotone" dataKey="averageProgress" stroke="#ff7300" name="Avg Progress" />
+                    </ComposedChart>
+                </ResponsiveContainer>
+            </div>
+        </motion.div>
+    );
+
+    // Chart 4: Resource Workload Distribution
+    const ResourceWorkloadDistribution = () => (
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white p-6 rounded-xl shadow-lg"
+        >
+            <h3 className="text-xl font-bold mb-6">Resource Workload Distribution</h3>
+            <div style={{ width: '100%', height: 400 }}>
+                <ResponsiveContainer>
+                    <RadialBarChart 
+                        innerRadius="10%" 
+                        outerRadius="80%" 
+                        data={[
+                            {
+                                name: 'Not Started',
+                                value: projectData.resourceMetrics[0].workload.byStatus.notStarted,
+                                fill: '#0088FE'
+                            },
+                            {
+                                name: 'In Progress',
+                                value: projectData.resourceMetrics[0].workload.byStatus.inProgress,
+                                fill: '#00C49F'
+                            },
+                            {
+                                name: 'Completed',
+                                value: projectData.resourceMetrics[0].workload.byStatus.completed,
+                                fill: '#FFBB28'
+                            }
+                        ]}
+                    >
+                        <RadialBar 
+                            minAngle={15} 
+                            label={{ position: 'insideStart', fill: '#fff' }} 
+                            background
+                            dataKey="value"
+                        />
+                        <Legend 
+                            iconSize={10} 
+                            layout="vertical" 
+                            verticalAlign="middle" 
+                            align="right"
+                        />
+                        <Tooltip content={<CustomTooltip />} />
+                    </RadialBarChart>
+                </ResponsiveContainer>
+            </div>
+        </motion.div>
+    );
+
+    return (
+        <div className="space-y-6">
+            {/* Project Analytics Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    className="bg-white p-4 rounded-xl shadow-lg"
+                >
+                    <h4 className="text-lg font-semibold">Overall Progress</h4>
+                    <p className="text-3xl font-bold text-blue-600">
+                        {(projectData.projectDetails.reduce((acc, proj) => acc + proj.progress, 0) / 
+                        projectData.projectDetails.length).toFixed(1)}%
+                    </p>
+                    <p className="text-sm text-gray-500">Average across all projects</p>
+                </motion.div>
+
+                <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    className="bg-white p-4 rounded-xl shadow-lg"
+                >
+                    <h4 className="text-lg font-semibold">Task Completion</h4>
+                    <p className="text-3xl font-bold text-green-600">
+                        {projectData.resourceMetrics[0].performance.completionRate.toFixed(1)}%
+                    </p>
+                    <p className="text-sm text-gray-500">Overall completion rate</p>
+                </motion.div>
+
+                <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    className="bg-white p-4 rounded-xl shadow-lg"
+                >
+                    <h4 className="text-lg font-semibold">On-Time Performance</h4>
+                    <p className="text-3xl font-bold text-purple-600">
+                        {projectData.resourceMetrics[0].performance.onTimeCompletion.toFixed(1)}%
+                    </p>
+                    <p className="text-sm text-gray-500">Tasks completed on time</p>
+                </motion.div>
+
+                <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    className="bg-white p-4 rounded-xl shadow-lg"
+                >
+                    <h4 className="text-lg font-semibold">Total Projects</h4>
+                    <p className="text-3xl font-bold text-orange-600">
+                        {projectData.projectDetails.length}
+                    </p>
+                    <p className="text-sm text-gray-500">Active projects</p>
+                </motion.div>
+            </div>
+
+            {/* Charts Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <ProjectProgressMatrix />
+                <TaskDistributionAnalysis />
+                <ProjectTimelinePerformance />
+                <ResourceWorkloadDistribution />
+            </div>
+        </div>
+    );
+};
