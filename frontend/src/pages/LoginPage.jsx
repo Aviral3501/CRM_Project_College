@@ -50,13 +50,13 @@ const LoginPage = () => {
 					</h2>
 
 					<form onSubmit={handleLogin}>
-						<Input
+						{/* <Input
 							icon={Building}
 							type='text'
 							placeholder='Organization Name'
 							value={organizationName}
 							onChange={(e) => setOrganizationName(e.target.value)}
-						/>
+						/> */}
 
 						<Input
 							icon={Mail}

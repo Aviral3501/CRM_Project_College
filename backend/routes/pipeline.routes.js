@@ -270,9 +270,10 @@ router.post('/update-pipeline', validateIds, async (req, res) => {
                 success: false,
                 message: 'Pipeline deal not found'
             });
-        }
+        } 
 
         // Create quote if pipeline is marked as won or lost
+        let quote_id = null;
         if (pipeline.stage === "Closed Won" || pipeline.stage === "Closed Lost") {
             // Check if a quote already exists for this pipeline
             const existingQuote = await Quote.findOne({ pipeline: pipeline._id });
@@ -303,10 +304,37 @@ router.post('/update-pipeline', validateIds, async (req, res) => {
 
                 await quote.save();
             }
-
-            // Include quote_id in the response
-            responseData.quote_id = quote.quote_id;
+            quote_id = quote.quote_id;
         }
+
+        // Construct response data
+        const responseData = {
+            pipeline_id: pipeline.pipeline_id,
+            title: pipeline.title,
+            amount: pipeline.amount,
+            stage: pipeline.stage,
+            lead: pipeline.lead ? {
+                name: pipeline.lead.name,
+                email: pipeline.lead.email,
+                company: pipeline.lead.company
+            } : null,
+            client: pipeline.client ? {
+                client_id: pipeline.client.client_id,
+                name: pipeline.client.name,
+                email: pipeline.client.email,
+                company: pipeline.client.company
+            } : null,
+            assignedTo: pipeline.assignedTo?.name || 'Unassigned',
+            client_id: pipeline.client ? pipeline.client.client_id : null,
+            assignedToId: pipeline.assignedTo?.user_id || null,
+            expectedCloseDate: pipeline.expectedCloseDate,
+            notes: pipeline.notes,
+            probability: pipeline.probability,
+            products: pipeline.products,
+            createdAt: pipeline.createdAt,
+            updatedAt: pipeline.updatedAt,
+            ...(quote_id && { quote_id })
+        };
 
         res.json({
             success: true,
