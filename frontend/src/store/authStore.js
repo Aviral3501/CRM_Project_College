@@ -2,7 +2,8 @@ import { create } from "zustand";
 import axios from "axios";
 import Cookies from "js-cookie";
 
-const API_URL = import.meta.env.MODE === "development" ? "http://localhost:5000/api/auth" : "/api/auth";
+// const API_URL = import.meta.env.MODE === "development" ? "http://localhost:5000/api/auth" : "/api/auth";
+const API_URL = "https://crm-project-college-backend.onrender.com/api/auth"; 
 console.log(import.meta.env);
 
 
@@ -60,7 +61,7 @@ export const useAuthStore = create((set) => ({
 	login: async (email, password) => {
 		set({ isLoading: true, error: null });
 		try {
-			const response = await axios.post(`${API_URL+"cdscdssd"}/login`, { email, password });
+			const response = await axios.post(`${API_URL}/login`, { email, password });
 			
 			// Store user data in cookie
 			Cookies.set('userData', JSON.stringify(response.data.user), { expires: 7 });
