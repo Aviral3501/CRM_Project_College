@@ -46,26 +46,38 @@ const allowedOrigins = [
     process.env.FRONTEND_URL, // Alternative env variable name
 ].filter(Boolean); // Remove undefined values
 
-// Use CORS middleware - allow localhost and origins in allowed list
-app.use(cors({ 
+// CORS configuration function - reusable for both middleware and OPTIONS
+const corsOptions = {
     origin: function (origin, callback) {
         // Allow requests with no origin (Postman, curl, mobile apps)
         if (!origin) return callback(null, true);
         
         // Allow if in allowed list
         if (allowedOrigins.includes(origin)) {
+            console.log(`✅ CORS allowing origin: ${origin}`);
             callback(null, true);
         }
         // Allow if actually localhost (with any port) - SECURE check using URL parsing
         else if (isLocalhost(origin)) {
+            console.log(`✅ CORS allowing localhost origin: ${origin}`);
             callback(null, true);
         } else {
-            console.log(`CORS blocked origin: ${origin}`);
+            console.log(`❌ CORS blocked origin: ${origin}`);
             callback(new Error('Not allowed by CORS'));
         }
     },
-    credentials: true // CRITICAL: Allow credentials (cookies)
-}));
+    credentials: true, // CRITICAL: Allow credentials (cookies)
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'], // Allow all methods
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'], // Allow headers
+    exposedHeaders: ['Content-Type'], // Expose headers
+    optionsSuccessStatus: 200 // Some legacy browsers (IE11) choke on 204
+};
+
+// Handle OPTIONS preflight requests FIRST (before CORS middleware)
+app.options('*', cors(corsOptions));
+
+// Use CORS middleware
+app.use(cors(corsOptions));
 
 app.use(express.json()); // allows us to parse incoming requests:req.body
 app.use(cookieParser()); // allows us to parse incoming cookies
