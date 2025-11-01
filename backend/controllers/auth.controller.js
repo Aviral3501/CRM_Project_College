@@ -248,16 +248,30 @@ export const resetPassword = async (req, res) => {
 // Check authentication function to verify user session
 export const checkAuth = async (req, res) => {
 	try {
-		// Find user by ID from request
-		const user = await User.findById(req.userId).select("-password"); // Exclude password from response
-		if (!user) {
-			return res.status(400).json({ success: false, message: "User not found" });
+		// If userId exists, try to find user
+		if (req.userId) {
+			const user = await User.findById(req.userId).select("-password"); // Exclude password from response
+			if (user) {
+				return res.status(200).json({ success: true, user }); // Return user information
+			}
 		}
-
-		res.status(200).json({ success: true, user }); // Return user information
+		
+		// No token or user not found - return success but no user (not authenticated)
+		res.status(200).json({ 
+			success: true, 
+			user: null,
+			authenticated: false,
+			message: "No active session" 
+		});
 	} catch (error) {
 		console.log("Error in checkAuth ", error); 
-		res.status(400).json({ success: false, message: error.message }); 
+		// Even on error, return success response (don't break the app)
+		res.status(200).json({ 
+			success: true, 
+			user: null,
+			authenticated: false,
+			message: "Session check failed" 
+		});
 	}
 };
 

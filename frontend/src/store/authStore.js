@@ -3,6 +3,8 @@ import axios from "axios";
 import Cookies from "js-cookie";
 
 const API_URL = import.meta.env.MODE === "development" ? "http://localhost:5000/api/auth" : "/api/auth";
+console.log(import.meta.env);
+
 
 axios.defaults.withCredentials = true;
 
@@ -131,10 +133,32 @@ export const useAuthStore = create((set) => ({
 		set({ isCheckingAuth: true, error: null });
 		try {
 			const response = await axios.get(`${API_URL}/check-auth`);
-			set({ user: response.data.user, isAuthenticated: true, isCheckingAuth: false });
+			// Handle both cases: with token (user exists) or without token (user is null)
+			if (response.data.success && response.data.user) {
+				// User is authenticated
+				set({ 
+					user: response.data.user, 
+					isAuthenticated: true, 
+					isCheckingAuth: false 
+				});
+			} else {
+				// No token or no user - not authenticated but no error
+				set({ 
+					user: null, 
+					isAuthenticated: false, 
+					isCheckingAuth: false,
+					error: null 
+				});
+			}
 		} catch (error) {
-			set({ error: null, isCheckingAuth: false, isAuthenticated: false });
-            console.error(error);
+			// Even on error, just mark as not authenticated - don't throw
+			console.log("checkAuth: No active session or error:", error.response?.data?.message || error.message);
+			set({ 
+				user: null, 
+				isAuthenticated: false, 
+				isCheckingAuth: false,
+				error: null 
+			});
 		}
 	},
 	forgotPassword: async (email) => {
