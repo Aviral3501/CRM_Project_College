@@ -24,16 +24,47 @@ const PORT = process.env.PORT || 5000;
 const __dirname = path.resolve();
 
 
+// Helper function to check if origin is actually localhost (with any port)
+const isLocalhost = (origin) => {
+    if (!origin) return false;
+    try {
+        const url = new URL(origin);
+        // Check if hostname is exactly 'localhost' or '127.0.0.1'
+        return url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]';
+    } catch (error) {
+        return false;
+    }
+};
+
 // Define allowed origins
 const allowedOrigins = [
     "http://localhost:5173",
-    "http://localhost:5174"
-];
+    "http://localhost:5174",
+    "http://localhost:3000",
+    "https://crm-project-college.vercel.app", // Vercel deployed frontend
+    process.env.CLIENT_URL, // Your deployed frontend URL (if set)
+    process.env.FRONTEND_URL, // Alternative env variable name
+].filter(Boolean); // Remove undefined values
 
-// Use CORS middleware
+// Use CORS middleware - allow localhost and origins in allowed list
 app.use(cors({ 
-    origin: allowedOrigins,
-    credentials: true // Allow credentials (cookies, authorization headers, etc.)
+    origin: function (origin, callback) {
+        // Allow requests with no origin (Postman, curl, mobile apps)
+        if (!origin) return callback(null, true);
+        
+        // Allow if in allowed list
+        if (allowedOrigins.includes(origin)) {
+            callback(null, true);
+        }
+        // Allow if actually localhost (with any port) - SECURE check using URL parsing
+        else if (isLocalhost(origin)) {
+            callback(null, true);
+        } else {
+            console.log(`CORS blocked origin: ${origin}`);
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true // CRITICAL: Allow credentials (cookies)
 }));
 
 app.use(express.json()); // allows us to parse incoming requests:req.body
