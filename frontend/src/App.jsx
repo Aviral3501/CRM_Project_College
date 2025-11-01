@@ -67,6 +67,8 @@ const App = () => {
 
 	if (isCheckingAuth) return <LoadingSpinner />;
 
+	
+
 	return (
 		<>
 			<Routes>
