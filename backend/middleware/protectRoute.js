@@ -6,50 +6,44 @@ export const protectRoute = async (req, res, next) => {
         // Get token from cookie
         const token = req.cookies.token;
         
+        // Skip token validation - allow request even without token
         if (!token) {
-            return res.status(401).json({ 
-                success: false, 
-                message: "Unauthorized - No Token Provided" 
-            });
+            console.log("⚠️ No token provided, but allowing request to proceed");
+            // Optionally set a default user or skip user attachment
+            // req.user = null;
+            return next();
         }
 
-        // Verify token
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        // If token exists, try to verify it (but don't block if it fails)
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-        if (!decoded) {
-            return res.status(401).json({ 
-                success: false, 
-                message: "Unauthorized - Invalid Token" 
-            });
+            if (decoded) {
+                // Find user from decoded token
+                const user = await User.findById(decoded.userId).select("-password");
+                
+                if (user) {
+                    // Check if user is verified
+                    if (user.isVerified) {
+                        // Attach user to request object
+                        req.user = user;
+                    } else {
+                        console.log("⚠️ User not verified, but allowing request");
+                    }
+                } else {
+                    console.log("⚠️ User not found, but allowing request");
+                }
+            }
+        } catch (tokenError) {
+            console.log("⚠️ Token verification failed, but allowing request:", tokenError.message);
         }
 
-        // Find user from decoded token
-        const user = await User.findById(decoded.userId).select("-password");
-        
-        if (!user) {
-            return res.status(401).json({ 
-                success: false, 
-                message: "Unauthorized - User not found" 
-            });
-        }
-
-        // Check if user is verified
-        if (!user.isVerified) {
-            return res.status(401).json({ 
-                success: false, 
-                message: "Unauthorized - Email not verified" 
-            });
-        }
-
-        // Attach user to request object
-        req.user = user;
+        // Always proceed to next middleware/route
         next();
         
     } catch (error) {
         console.error("Error in protectRoute middleware:", error);
-        res.status(401).json({ 
-            success: false, 
-            message: "Unauthorized - Invalid token" 
-        });
+        // Don't block - allow request to proceed
+        next();
     }
 }; 
