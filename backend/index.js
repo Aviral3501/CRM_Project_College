@@ -29,7 +29,6 @@ const allowedOrigins = [
     "http://localhost:5173",
     "http://localhost:5174",
 	"http://localhost:4173/",
-	process.env.VITE_BACKEND_URL,
 	process.env.VITE_FRONTEND_URL,
 ];
 
@@ -63,7 +62,7 @@ app.use("/api/pipeline", pipelineRoutes);
 app.use("/api/quotes", quoteRoutes);
 app.use("/api/analytics", analyticsRoutes);
 
-console.log("process.env.NODE_ENV =",process.env.VITE_BACKEND_URL)
+console.log("process.env.VITE_BACKEND_URL =",process.env.VITE_BACKEND_URL)
 
 if (process.env.NODE_ENV === "production") {
 	console.log("here")
