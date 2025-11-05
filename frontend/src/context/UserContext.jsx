@@ -7,7 +7,7 @@ const UserContext = createContext();
 // Get BASE_URL from environment or use default
 const getBaseUrl = () => {
   if (import.meta.env.VITE_BASE_URL) {
-    console.log('Using VITE_BASE_URL from environment:', import.meta.env.VITE_BASE_URL);
+    // console.log('Using VITE_BASE_URL from environment:', import.meta.env.VITE_BASE_URL);
     return import.meta.env.VITE_BASE_URL;
   }
   
