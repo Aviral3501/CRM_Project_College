@@ -24,25 +24,24 @@ const PORT = process.env.PORT || 5000;
 const __dirname = path.resolve();
 
 
-// Define allowed origins
-const allowedOrigins = [
-    "http://localhost:5173",
-    "http://localhost:5174",
-	"http://localhost:4173/",
-	process.env.VITE_FRONTEND_URL,
-];
+const allowedOrigins = process.env.FRONTEND_URLS?.split(",") || ["*"];
+
+console.log("ALLOWD ORIGINS :",allowedOrigins)
 
 // Use CORS middleware
-app.use(cors({
-	origin: (origin, callback) => {
-	  if (!origin || allowedOrigins.includes(origin)) {
-		callback(null, true);
-	  } else {
-		callback(new Error('Not allowed by CORS'));
-	  }
-	},
-	credentials: true,
-  }));
+app.use(
+	cors({
+	  origin: function (origin, callback) {
+		// Allow requests with no origin (like mobile apps or curl)
+		if (!origin) return callback(null, true);
+		if (allowedOrigins.includes(origin)) return callback(null, true);
+		return callback(new Error("CORS blocked: " + origin));
+	  },
+	  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+	  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+	  credentials: true,
+	})
+  );
 
 
 

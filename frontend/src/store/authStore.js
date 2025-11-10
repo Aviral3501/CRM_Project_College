@@ -3,7 +3,7 @@ import axios from "axios";
 import Cookies from "js-cookie";
 
 // Correct the API_URL to use VITE_BACKEND_URL in production
-const API_URL = import.meta.env.VITE_NODE_ENV == "production" 
+const API_URL = import.meta.env.VITE_NODE_ENV == "production1" 
   ? `${import.meta.env.VITE_BACKEND_URL}/auth`: "http://localhost:5000/api/auth" ;
   
 // Remove the original API_URL declaration and replace with the code above

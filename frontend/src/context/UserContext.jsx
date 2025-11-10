@@ -6,16 +6,16 @@ const UserContext = createContext();
 
 // Get BASE_URL from environment or use default
 const getBaseUrl = () => {
-  if (import.meta.env.VITE_BASE_URL) {
-    // console.log('Using VITE_BASE_URL from environment:', import.meta.env.VITE_BASE_URL);
-    return import.meta.env.VITE_BASE_URL;
-  }
+  // if (import.meta.env.VITE_BACKEND_URL) {
+  //   // console.log('Using VITE_BACKEND_URL from environment:', import.meta.env.VITE_BACKEND_URL);
+  //   return import.meta.env.VITE_BACKEND_URL;
+  // }
   
-  // If NODE_ENV is production, use relative path
-  if (import.meta.env.MODE === "production") {
-    console.log('Using production relative path /api');
-    return "/api";
-  }
+  // // If NODE_ENV is production, use relative path
+  // if (import.meta.env.MODE === "production") {
+  //   console.log('Using production relative path /api');
+  //   return "/api";
+  // }
   
   // Default to localhost for development for backend
   console.log('Using development URL: http://localhost:5000/api');
