@@ -3,10 +3,10 @@ import axios from "axios";
 import Cookies from "js-cookie";
 
 // ✅ Set correct API base URL depending on environment
-const API_URL =
-  import.meta.env.VITE_NODE_ENV === "production"
-    ? `${import.meta.env.VITE_BACKEND_URL}/auth`
-    : "http://localhost:5000/api/auth";
+const API_URL = `${
+  import.meta.env.VITE_BACKEND_URL
+}/auth`;
+
 
 // ✅ Enable credentials for cross-origin requests (cookies, sessions)
 axios.defaults.withCredentials = true;

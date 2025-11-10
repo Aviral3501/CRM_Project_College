@@ -1,4 +1,5 @@
 import axios from 'axios';
+import axiosInstance from '../../api/axios';
 
 const API_URL = import.meta.env.MODE === "development" ? "http://localhost:5000/api" : "/api";
 axios.defaults.withCredentials = true;
@@ -86,7 +87,7 @@ const createTestTasks = async (user_id, project_id) => {
                 status: task.status || "Pending"
             };
             
-            const response = await axios.post(`${API_URL}/tasks/create`, taskData);
+            const response = await axiosInstance.post(`${API_URL}/tasks/create`, taskData);
             console.log(`Created task: ${response.data.task.title}`);
             createdTasks.push(response.data.task);
         }

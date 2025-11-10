@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
 import { DocumentIcon } from '@heroicons/react/24/outline';
 import { ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/outline'; 
+import axiosInstance from '../../api/axios';
 
 const Pipeline = () => {
     const [pipelineDeals, setPipelineDeals] = useState([]);
@@ -38,7 +39,7 @@ const Pipeline = () => {
             setIsLoading(true);
             console.log("Fetching pipeline deals for org:", userData.organization_id);
             
-            const response = await axios.post(`${BASE_URL}/pipeline/get-pipeline`, {
+            const response = await axiosInstance.post(`${BASE_URL}/pipeline/get-pipeline`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id
             });
@@ -77,7 +78,7 @@ const Pipeline = () => {
         try {
             console.log("Updating deal stage:", dealId, newStage);
             
-            const response = await axios.post(`${BASE_URL}/pipeline/update-pipeline`, {
+            const response = await axiosInstance.post(`${BASE_URL}/pipeline/update-pipeline`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id,
                 pipeline_id: dealId,
@@ -174,7 +175,7 @@ const Pipeline = () => {
         if (!selectedPipeline) return;
         setIsProcessing(true);
         try {
-            await axios.post(`${BASE_URL}/pipeline/delete-pipeline`, {
+            await axiosInstance.post(`${BASE_URL}/pipeline/delete-pipeline`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id,
                 pipeline_id: selectedPipeline.pipeline_id
@@ -213,7 +214,7 @@ const Pipeline = () => {
         if (!isEditFormValid) return;
         setIsProcessing(true);
         try {
-            await axios.post(`${BASE_URL}/pipeline/update-pipeline`, {
+            await axiosInstance.post(`${BASE_URL}/pipeline/update-pipeline`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id,
                 pipeline_id: editForm.pipeline_id,

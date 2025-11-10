@@ -28,6 +28,7 @@ import {
 import axios from 'axios';
 import { useUser } from '../../context/UserContext';
 import toast from 'react-hot-toast';
+import axiosInstance from '../../api/axios';
 
 const TaskModal = ({ isOpen, onClose, onSubmit }) => {
     const initialFormState = {
@@ -68,7 +69,7 @@ const TaskModal = ({ isOpen, onClose, onSubmit }) => {
                 user_id: userData.user_id
             });
 
-            const response = await axios.post(`${BASE_URL}/projects/get-projects`, {
+            const response = await axiosInstance.post(`${BASE_URL}/projects/get-projects`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id
             });
@@ -194,7 +195,7 @@ const TaskModal = ({ isOpen, onClose, onSubmit }) => {
             
             console.log('Creating task with payload:', payload);
             
-            const response = await axios.post(`${BASE_URL}/tasks/create-task`, payload);
+            const response = await axiosInstance.post(`${BASE_URL}/tasks/create-task`, payload);
             
             console.log('Create task response:', response.data);
             
@@ -442,7 +443,7 @@ const TaskDetailsModal = ({ isOpen, onClose, task, onUpdate }) => {
 
     const fetchProjects = async () => {
         try {
-            const response = await axios.post(`${BASE_URL}/projects/get-projects`, {
+            const response = await axiosInstance.post(`${BASE_URL}/projects/get-projects`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id
             });
@@ -545,7 +546,7 @@ const TaskDetailsModal = ({ isOpen, onClose, task, onUpdate }) => {
 
             console.log('Updating task with payload:', payload);
 
-            const response = await axios.post(`${BASE_URL}/tasks/update-task`, payload);
+            const response = await axiosInstance.post(`${BASE_URL}/tasks/update-task`, payload);
 
             if (response.data.success) {
                 toast.success('Task updated successfully!');
@@ -751,7 +752,7 @@ const AllTasksModal = ({ isOpen, onClose }) => {
     const fetchGroupedTasks = async () => {
         try {
             setIsLoading(true);
-            const response = await axios.post(`${BASE_URL}/tasks/get-task-in-groups`, {
+            const response = await axiosInstance.post(`${BASE_URL}/tasks/get-task-in-groups`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id
             });
@@ -934,7 +935,7 @@ const CompletedTasksModal = ({ isOpen, onClose }) => {
     const fetchGroupedTasks = async () => {
         try {
             setIsLoading(true);
-            const response = await axios.post(`${BASE_URL}/tasks/get-task-in-groups`, {
+            const response = await axiosInstance.post(`${BASE_URL}/tasks/get-task-in-groups`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id
             });
@@ -1102,7 +1103,7 @@ const InProgressTasksModal = ({ isOpen, onClose }) => {
     const fetchGroupedTasks = async () => {
         try {
             setIsLoading(true);
-            const response = await axios.post(`${BASE_URL}/tasks/get-task-in-groups`, {
+            const response = await axiosInstance.post(`${BASE_URL}/tasks/get-task-in-groups`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id
             });
@@ -1276,7 +1277,7 @@ const HighPriorityTasksModal = ({ isOpen, onClose }) => {
     const fetchGroupedTasks = async () => {
         try {
             setIsLoading(true);
-            const response = await axios.post(`${BASE_URL}/tasks/get-task-in-groups`, {
+            const response = await axiosInstance.post(`${BASE_URL}/tasks/get-task-in-groups`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id
             });
@@ -1512,7 +1513,7 @@ const Tasks = () => {
                     user_id: userData.user_id
                 });
 
-                const response = await axios.post(`${BASE_URL}/tasks/get-tasks`, {
+                const response = await axiosInstance.post(`${BASE_URL}/tasks/get-tasks`, {
                     organization_id: userData.organization_id,
                     user_id: userData.user_id
                 });

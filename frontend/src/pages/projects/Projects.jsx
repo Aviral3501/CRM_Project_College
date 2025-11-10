@@ -12,6 +12,7 @@ import { motion } from 'framer-motion';
 import axios from 'axios';
 import { useUser } from '../../context/UserContext';
 import { toast } from 'react-hot-toast';
+import axiosInstance from '../../api/axios';
 
 const BASE_URL = 'http://localhost:5000/api';
 
@@ -32,7 +33,7 @@ const EmployeeSearch = ({ onSelectEmployee, selectedEmployees }) => {
         const fetchEmployees = async () => {
             try {
                 setLoading(true);
-                const response = await axios.post(`${BASE_URL}/employees/get-employees`, {
+                const response = await axiosInstance.post(`${BASE_URL}/employees/get-employees`, {
                     organization_id: userData.organization_id,
                     user_id: userData.user_id
                 });
@@ -179,7 +180,7 @@ const Projects = () => {
         const fetchProjects = async () => {
             try {
                 setLoading(true);
-                const response = await axios.post(`${BASE_URL}/projects/get-projects`, {
+                const response = await axiosInstance.post(`${BASE_URL}/projects/get-projects`, {
                     organization_id: userData.organization_id,
                     user_id: userData.user_id
                 });
@@ -215,7 +216,7 @@ const Projects = () => {
             };
             
             console.log('Sending project payload:', projectPayload);
-            const response = await axios.post(`${BASE_URL}/projects/create-project`, projectPayload);
+            const response = await axiosInstance.post(`${BASE_URL}/projects/create-project`, projectPayload);
             
             if (response.data.success) {
                 setProjects(prev => [...prev, response.data.data]);
@@ -252,7 +253,7 @@ const Projects = () => {
             };
             console.log('Complete Project Payload (Update):', projectPayload);
 
-            const response = await axios.post(`${BASE_URL}/projects/update-project`, projectPayload);
+            const response = await axiosInstance.post(`${BASE_URL}/projects/update-project`, projectPayload);
 
             if (response.data.success) {
                 setProjects(prev => prev.map(p =>
@@ -272,7 +273,7 @@ const Projects = () => {
 
     const handleDeleteProject = async (projectId) => {
         try {
-            const response = await axios.post(`${BASE_URL}/projects/delete-project`, {
+            const response = await axiosInstance.post(`${BASE_URL}/projects/delete-project`, {
                 project_id: projectId,
                 organization_id: userData.organization_id,
                 user_id: userData.user_id
@@ -880,7 +881,7 @@ const AddProjectModal = ({ isOpen, onClose, onSubmit, selectedTeamMembers, setSe
     const fetchEmployees = async () => {
         try {
             setLoading(true);
-            const response = await axios.post(`${BASE_URL}/employees/get-employees`, {
+            const response = await axiosInstance.post(`${BASE_URL}/employees/get-employees`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id
             });
@@ -1469,7 +1470,7 @@ const EditProjectModal = ({ isOpen, onClose, onSubmit, project }) => {
     const fetchEmployees = async () => {
         try {
             setLoading(true);
-            const response = await axios.post(`${BASE_URL}/employees/get-employees`, {
+            const response = await axiosInstance.post(`${BASE_URL}/employees/get-employees`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id
             });

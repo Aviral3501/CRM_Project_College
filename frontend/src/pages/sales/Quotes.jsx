@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useUser } from "../../context/UserContext";
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
+import axiosInstance from '../../api/axios';
 
 // Create/Edit Quote Modal
 const QuoteFormModal = ({ 
@@ -1279,7 +1280,7 @@ const Quotes = () => {
     // Fetch clients from backend
     const fetchClients = async () => {
         try {
-            const response = await axios.post(`${BASE_URL}/clients/get-clients`, {
+            const response = await axiosInstance.post(`${BASE_URL}/clients/get-clients`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id
             });
@@ -1299,7 +1300,7 @@ const Quotes = () => {
     const fetchQuotes = async () => {
         try {
             setIsLoading(true);
-            const response = await axios.post(`${BASE_URL}/quotes/get-quotes`, {
+            const response = await axiosInstance.post(`${BASE_URL}/quotes/get-quotes`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id
             });
@@ -1454,7 +1455,7 @@ const Quotes = () => {
 
     const handleCreateQuote = async (newQuote) => {
         try {
-            const response = await axios.post(`${BASE_URL}/quotes/create-quote`, {
+            const response = await axiosInstance.post(`${BASE_URL}/quotes/create-quote`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id,
                 title: newQuote.title,
@@ -1499,7 +1500,7 @@ const Quotes = () => {
     };
     const handleUpdateQuote = async (updatedQuote) => {
         try {
-            const response = await axios.post(`${BASE_URL}/quotes/update-quote`, {
+            const response = await axiosInstance.post(`${BASE_URL}/quotes/update-quote`, {
                 quote_id: updatedQuote.quote_id,
                 organization_id: userData.organization_id,
                 user_id: userData.user_id,
@@ -1539,7 +1540,7 @@ const Quotes = () => {
     };
     const handleDeleteQuote = async (quoteId) => {
         try {
-            const response = await axios.post(`${BASE_URL}/quotes/delete-quote`, {
+            const response = await axiosInstance.post(`${BASE_URL}/quotes/delete-quote`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id,
                 quote_id: quoteId

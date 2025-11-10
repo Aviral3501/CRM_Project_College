@@ -12,6 +12,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import { useUser } from "../../context/UserContext";
+import axiosInstance from '../../api/axios';
 
 
 const Analytics = () => {
@@ -26,7 +27,7 @@ const Analytics = () => {
             const fetchProjectAnalytics = async () => {
                 try {
                     setIsLoading(true);
-                    const response = await axios.post(`${BASE_URL}/analytics/projects`, {
+                    const response = await axiosInstance.post(`${BASE_URL}/analytics/projects`, {
                         organization_id: userData.organization_id,
                         user_id: userData.user_id
                     });
@@ -173,7 +174,7 @@ const Analytics = () => {
         const fetchSalesAnalytics = async () => {
             try {
                 setIsLoading(true);
-                const response = await axios.post(`${BASE_URL}/analytics/sales`, {
+                const response = await axiosInstance.post(`${BASE_URL}/analytics/sales`, {
                     organization_id: userData.organization_id,
                     user_id: userData.user_id
                 });
@@ -202,7 +203,7 @@ const Analytics = () => {
             const fetchDashboardAnalytics = async () => {
                 try {
                     setIsLoading(true);
-                    const response = await axios.post(`${BASE_URL}/analytics/dashboard`, {
+                    const response = await axiosInstance.post(`${BASE_URL}/analytics/dashboard`, {
                         organization_id: userData.organization_id,
                         user_id: userData.user_id
                     });

@@ -11,6 +11,7 @@ import {
     RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
     LineChart, Line, AreaChart, Area
 } from 'recharts';
+import axiosInstance from '../../api/axios';
 
 const AnalyticsSection = ({ employees }) => {
     // Data preparation functions
@@ -657,7 +658,7 @@ const Employees = () => {
                     user_id: userData.user_id
                 });
 
-                const response = await axios.post(`${BASE_URL}/employees/get-employees`, {
+                const response = await axiosInstance.post(`${BASE_URL}/employees/get-employees`, {
                     organization_id: userData.organization_id,
                     user_id: userData.user_id
                 });
@@ -698,7 +699,7 @@ const Employees = () => {
     const handleAddEmployee = async (newEmployee) => {
         try {
             console.log('Creating new employee:', newEmployee);
-            const response = await axios.post(`${BASE_URL}/employees/create-employee`, {
+            const response = await axiosInstance.post(`${BASE_URL}/employees/create-employee`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id,
                 name: newEmployee.name,
@@ -712,7 +713,7 @@ const Employees = () => {
 
             if (response.data.success) {
                 // Refresh the employees list
-                const updatedResponse = await axios.post(`${BASE_URL}/employees/get-employees`, {
+                const updatedResponse = await axiosInstance.post(`${BASE_URL}/employees/get-employees`, {
                     organization_id: userData.organization_id,
                     user_id: userData.user_id
                 });
@@ -748,7 +749,7 @@ const Employees = () => {
     const handleConfirmRemove = async () => {
         try {
             console.log('Removing employee:', removeEmployee);
-            const response = await axios.post(`${BASE_URL}/employees/delete-employee`, {
+            const response = await axiosInstance.post(`${BASE_URL}/employees/delete-employee`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id,
                 target_user_id: removeEmployee.user_id
@@ -756,7 +757,7 @@ const Employees = () => {
 
             if (response.data.success) {
                 // Refresh the employees list
-                const updatedResponse = await axios.post(`${BASE_URL}/employees/get-employees`, {
+                const updatedResponse = await axiosInstance.post(`${BASE_URL}/employees/get-employees`, {
                     organization_id: userData.organization_id,
                     user_id: userData.user_id
                 });
@@ -783,7 +784,7 @@ const Employees = () => {
     const handleUpdateEmployee = async (updatedEmployee) => {
         try {
             console.log('Updating employee:', updatedEmployee);
-            const response = await axios.post(`${BASE_URL}/employees/update-employee`, {
+            const response = await axiosInstance.post(`${BASE_URL}/employees/update-employee`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id,
                 target_user_id: updatedEmployee.user_id,
@@ -797,7 +798,7 @@ const Employees = () => {
 
             if (response.data.success) {
                 // Refresh the employees list
-                const updatedResponse = await axios.post(`${BASE_URL}/employees/get-employees`, {
+                const updatedResponse = await axiosInstance.post(`${BASE_URL}/employees/get-employees`, {
                     organization_id: userData.organization_id,
                     user_id: userData.user_id
                 });

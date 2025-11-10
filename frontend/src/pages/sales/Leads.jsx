@@ -4,6 +4,7 @@ import { Plus, Search, Filter, Edit, Trash2, X, Check, ChevronDown, ArrowRight }
 import { useUser } from '../../context/UserContext';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import axiosInstance from '../../api/axios';
 
 const CreateLeadModal = ({ isOpen, onClose, onSubmit }) => {
     const initialFormState = {
@@ -49,7 +50,7 @@ const CreateLeadModal = ({ isOpen, onClose, onSubmit }) => {
     const fetchClients = async () => {
         try {
             setIsLoadingClients(true);
-            const response = await axios.post(`${BASE_URL}/clients/get-clients`, {
+            const response = await axiosInstance.post(`${BASE_URL}/clients/get-clients`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id
             });
@@ -70,7 +71,7 @@ const CreateLeadModal = ({ isOpen, onClose, onSubmit }) => {
     const fetchEmployees = async () => {
         try {
             setIsLoadingEmployees(true);
-            const response = await axios.post(`${BASE_URL}/employees/get-employees`, {
+            const response = await axiosInstance.post(`${BASE_URL}/employees/get-employees`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id
             });
@@ -167,7 +168,7 @@ const CreateLeadModal = ({ isOpen, onClose, onSubmit }) => {
                 payload.client_id = selectedClient.client_id;
             }
 
-            const response = await axios.post(`${BASE_URL}/leads/create-lead`, payload);
+            const response = await axiosInstance.post(`${BASE_URL}/leads/create-lead`, payload);
 
             if (response.data.success) {
                 toast.success('Lead created successfully!');
@@ -566,7 +567,7 @@ const EditLeadModal = ({ isOpen, onClose, onSubmit, initialData }) => {
     const fetchClients = async () => {
         try {
             setIsLoadingClients(true);
-            const response = await axios.post(`${BASE_URL}/clients/get-clients`, {
+            const response = await axiosInstance.post(`${BASE_URL}/clients/get-clients`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id
             });
@@ -587,7 +588,7 @@ const EditLeadModal = ({ isOpen, onClose, onSubmit, initialData }) => {
     const fetchEmployees = async () => {
         try {
             setIsLoadingEmployees(true);
-            const response = await axios.post(`${BASE_URL}/employees/get-employees`, {
+            const response = await axiosInstance.post(`${BASE_URL}/employees/get-employees`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id
             });
@@ -679,7 +680,7 @@ const EditLeadModal = ({ isOpen, onClose, onSubmit, initialData }) => {
                 payload.assignedTo = formData.assignedToId;
             }
 
-            const response = await axios.post(`${BASE_URL}/leads/update-lead`, payload);
+            const response = await axiosInstance.post(`${BASE_URL}/leads/update-lead`, payload);
 
             if (response.data.success) {
                 toast.success('Lead updated successfully!');
@@ -1074,7 +1075,7 @@ const FilterModal = ({ isOpen, onClose, onApply, filters, setFilters }) => {
         if (fetchedEmployeesRef.current) return;
         try {
             setIsLoadingEmployees(true);
-            const response = await axios.post(`${BASE_URL}/employees/get-employees`, {
+            const response = await axiosInstance.post(`${BASE_URL}/employees/get-employees`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id
             });
@@ -1306,7 +1307,7 @@ const Leads = () => {
                 user_id: userData.user_id
             });
 
-            const response = await axios.post(`${BASE_URL}/leads/get-leads`, {
+            const response = await axiosInstance.post(`${BASE_URL}/leads/get-leads`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id
             });
@@ -1364,7 +1365,7 @@ const Leads = () => {
 
     const handleConfirmDelete = async () => {
         try {
-            const response = await axios.post(`${BASE_URL}/leads/delete-lead`, {
+            const response = await axiosInstance.post(`${BASE_URL}/leads/delete-lead`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id,
                 lead_ids: selectedLeads
@@ -1397,7 +1398,7 @@ const Leads = () => {
     const handleUpdateLead = async (updatedLead) => {
         try {
             // Fetch all leads to get the fresh data
-            const response = await axios.post(`${BASE_URL}/leads/get-leads`, {
+            const response = await axiosInstance.post(`${BASE_URL}/leads/get-leads`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id
             });
@@ -1429,7 +1430,7 @@ const Leads = () => {
             // Get the selected lead to access its client_id
             const selectedLead = filteredLeads.find(lead => lead.lead_id === selectedLeads[0]);
             
-            const response = await axios.post(`${BASE_URL}/pipeline/generate-pipeline-from-leads`, {
+            const response = await axiosInstance.post(`${BASE_URL}/pipeline/generate-pipeline-from-leads`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id,
                 lead_ids: selectedLeads,

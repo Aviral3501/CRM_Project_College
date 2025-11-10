@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import { useUser } from '../../context/UserContext';
+import axiosInstance from '../../api/axios';
 
 // HighlightedText component for search results
 const HighlightedText = ({ text, highlight }) => {
@@ -1760,7 +1761,7 @@ const Customers = () => {
     const fetchClients = async () => {
         try {
             setLoading(true);
-            const response = await axios.post(`${BASE_URL}/clients/get-clients`, {
+            const response = await axiosInstance.post(`${BASE_URL}/clients/get-clients`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id
             });
@@ -1782,7 +1783,7 @@ const Customers = () => {
 
     const handleAddClient = async (clientData) => {
         try {
-            const response = await axios.post(`${BASE_URL}/clients/create-client`, {
+            const response = await axiosInstance.post(`${BASE_URL}/clients/create-client`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id,
                 ...clientData
@@ -1824,7 +1825,7 @@ const Customers = () => {
 
         console.log("sanitizedData", sanitizedData);
         try {
-            const response = await axios.post(`${BASE_URL}/clients/update-client`, {
+            const response = await axiosInstance.post(`${BASE_URL}/clients/update-client`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id,
                 client_id: clientData.client_id,
@@ -1845,7 +1846,7 @@ const Customers = () => {
 
     const handleDeleteClient = async (clientId) => {
         try {
-            const response = await axios.post(`${BASE_URL}/clients/delete-client`, {
+            const response = await axiosInstance.post(`${BASE_URL}/clients/delete-client`, {
                 organization_id: userData.organization_id,
                 user_id: userData.user_id,
                 client_id: clientId
