@@ -1,92 +1,87 @@
+import axios from "axios";
+import dotenv from "dotenv";
 import {
-	PASSWORD_RESET_REQUEST_TEMPLATE,
-	PASSWORD_RESET_SUCCESS_TEMPLATE,
-	VERIFICATION_EMAIL_TEMPLATE,
-	WELCOME_EMAIL_TEMPLATE,
+  PASSWORD_RESET_REQUEST_TEMPLATE,
+  PASSWORD_RESET_SUCCESS_TEMPLATE,
+  VERIFICATION_EMAIL_TEMPLATE,
+  WELCOME_EMAIL_TEMPLATE,
 } from "./emailTemplates.js";
-import { mailtrapClient, sender } from "./mailtrap.config.js";
-import transporter from "../nodemailer/nodemailer.js";
 
+dotenv.config();
 
+const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
+
+// ✅ Reusable function to send emails via Brevo API
+const sendEmail = async ({ to, subject, html }) => {
+  try {
+    const emailData = {
+      sender: {
+        name: process.env.SENDER_NAME || "CRM_App Team",
+        email: process.env.SENDER_EMAIL, // must be verified in Brevo
+      },
+      to: [{ email: to }],
+      subject,
+      htmlContent: html,
+      textContent: "If you cannot view this email, please use an HTML-compatible client.",
+    };
+
+    const response = await axios.post(BREVO_API_URL, emailData, {
+      headers: {
+        "Content-Type": "application/json",
+        "api-key": BREVO_API_KEY,
+      },
+    });
+
+    console.log("✅ Email sent successfully to:", to);
+    console.log("Brevo response:", response.data);
+  } catch (error) {
+    console.error("❌ Error sending email:", error.response?.data || error.message);
+    throw new Error("Failed to send email");
+  }
+};
+
+// ✅ Send verification email
 export const sendVerificationEmail = async (email, verificationToken) => {
-	const recipient = [{ email }];
+  const html = VERIFICATION_EMAIL_TEMPLATE.replace("{verificationCode}", verificationToken);
 
-	try {
-		// Replace the verification token placeholder in the template with the actual verification token
-		const response = await transporter.sendMail({
-			from: process.env.SENDER_EMAIL, // Use the sender email from environment variables
-			to: email, // Directly use the email parameter
-			subject: "Verify your email",
-			html: VERIFICATION_EMAIL_TEMPLATE.replace("{verificationCode}", verificationToken), // Use the HTML template
-		});
-
-		console.log("Email sent successfully", response);
-	} catch (error) {
-		console.error(`Error sending verification`, error);
-		throw new Error(`Error sending verification email: ${error}`);
-	}
+  await sendEmail({
+    to: email,
+    subject: "Verify your email address",
+    html,
+  });
 };
 
-
+// ✅ Send welcome email
 export const sendWelcomeEmail = async (email, name) => {
-	const recipient = email; // Directly use the email parameter
+  const html = WELCOME_EMAIL_TEMPLATE
+    .replaceAll("{company_info_name}", "CRM_App")
+    .replaceAll("{recipient_name}", name);
 
-	try {
-		// Replace the placeholders in the template with actual values
-		const htmlContent = WELCOME_EMAIL_TEMPLATE
-			.replaceAll("{company_info_name}", "CRM_App") // Replace with actual company name
-			.replaceAll("{recipient_name}", name); // Replace with actual recipient name
-
-		const response = await transporter.sendMail({
-			from: process.env.SENDER_EMAIL, // Use the sender email from environment variables
-			to: recipient, // Use the recipient email
-			subject: "Welcome to CRM_App!", // Subject of the email
-			html: htmlContent, // Use the HTML content with replaced placeholders
-		});
-
-		console.log("Welcome email sent successfully", response);
-	} catch (error) {
-		console.error(`Error sending welcome email`, error);
-		throw new Error(`Error sending welcome email: ${error}`);
-	}
+  await sendEmail({
+    to: email,
+    subject: "Welcome to CRM_App!",
+    html,
+  });
 };
 
-
-
+// ✅ Send password reset email
 export const sendPasswordResetEmail = async (email, resetURL) => {
-	const recipient = email; // Directly use the email parameter
+	console.log("this is the reset URL,",resetURL)
+  const html = PASSWORD_RESET_REQUEST_TEMPLATE.replace("{resetURL}", resetURL);
 
-	try {
-		const htmlContent = PASSWORD_RESET_REQUEST_TEMPLATE.replace("{resetURL}", resetURL); // Replace the reset URL in the template
-
-		const response = await transporter.sendMail({
-			from: process.env.SENDER_EMAIL, // Use the sender email from environment variables
-			to: recipient, // Use the recipient email
-			subject: "Reset your password", // Subject of the email
-			html: htmlContent, // Use the HTML content with the replaced reset URL
-		});
-
-		console.log("Password reset email sent successfully", response);
-	} catch (error) {
-		console.error(`Error sending password reset email`, error);
-		throw new Error(`Error sending password reset email: ${error}`);
-	}
+  await sendEmail({
+    to: email,
+    subject: "Reset your password",
+    html,
+  });
 };
 
+// ✅ Send password reset success email
 export const sendResetSuccessEmail = async (email) => {
-	const recipient = email; // Directly use the email parameter
-
-	try {
-		const response = await transporter.sendMail({
-			from: process.env.SENDER_EMAIL, // Use the sender email from environment variables
-			to: recipient, // Use the recipient email
-			subject: "Password Reset Successful", // Subject of the email
-			html: PASSWORD_RESET_SUCCESS_TEMPLATE, // Use the HTML template for success
-		});
-
-		console.log("Password reset success email sent successfully", response);
-	} catch (error) {
-		console.error(`Error sending password reset success email`, error);
-		throw new Error(`Error sending password reset success email: ${error}`);
-	}
+  await sendEmail({
+    to: email,
+    subject: "Password Reset Successful",
+    html: PASSWORD_RESET_SUCCESS_TEMPLATE,
+  });
 };

@@ -1,5 +1,8 @@
 import bcryptjs from "bcryptjs"; // Import bcryptjs for password hashing
 import crypto from "crypto"; // Import crypto for generating secure tokens
+import dotenv from"dotenv";
+
+dotenv.config();
 
 import { generateTokenAndSetCookie } from "../utils/generateTokenAndSetCookie.js"; // Import token generation utility
 import {
@@ -9,8 +12,8 @@ import {
 	sendWelcomeEmail,
 } from "../mailtrap/emails.js"; // Import email sending functions
 import { User } from "../models/user.model.js"; // Import User model
-import transporter from "../nodemailer/nodemailer.js";
-import { VERIFICATION_EMAIL_TEMPLATE } from "../mailtrap/emailTemplates.js";
+// import transporter from "../nodemailer/nodemailer.js";
+// import { VERIFICATION_EMAIL_TEMPLATE } from "../mailtrap/emailTemplates.js";
 import { Organization } from "../models/org.model.js";
 
 // Helper function to generate 6-digit OTP
@@ -201,6 +204,8 @@ export const forgotPassword = async (req, res) => {
 		user.resetPasswordExpiresAt = resetTokenExpiresAt; // Set expiration time
 
 		await user.save(); // Save user with reset token
+
+		console.log("in forgot pass ::::,",process.env.VITE_FRONTEND_URL)
 
 		// Send password reset email
 		await sendPasswordResetEmail(user.email, `${process.env.VITE_FRONTEND_URL}/reset-password/${resetToken}`);

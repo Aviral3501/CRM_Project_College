@@ -1,39 +1,27 @@
-import { create } from "zustand";
 import axios from "axios";
+import { create } from "zustand";
 import Cookies from "js-cookie";
 
-// ✅ Set correct API base URL depending on environment
-const API_URL = `${
-  import.meta.env.VITE_BACKEND_URL
-}/auth`;
+// ✅ API base URL
+const API_URL = `${import.meta.env.VITE_BACKEND_URL}/auth`;
 
-
-// ✅ Enable credentials for cross-origin requests (cookies, sessions)
-axios.defaults.withCredentials = true;
-
-// ✅ Create a default Axios instance with CORS headers
+// ✅ Create axios instance
 const axiosInstance = axios.create({
   baseURL: API_URL,
-  withCredentials: true,
+  withCredentials: true, // send cookies, etc.
   headers: {
     "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": "*", // allow all origins (you can restrict this in production)
-    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
   },
 });
 
-// ✅ Optional: Interceptor to ensure all requests always carry CORS headers
+// ✅ Optional request interceptor (no CORS headers)
 axiosInstance.interceptors.request.use(
   (config) => {
-    config.headers["Access-Control-Allow-Origin"] = "*";
-    config.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS";
-    config.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization";
+    // you can log or modify config here
     return config;
   },
   (error) => Promise.reject(error)
 );
-
 // ✅ Zustand store
 export const useAuthStore = create((set) => ({
   user: null,

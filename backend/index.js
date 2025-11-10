@@ -16,6 +16,7 @@ import clientRoutes from "./routes/client.routes.js";
 import pipelineRoutes from "./routes/pipeline.routes.js";
 import quoteRoutes from "./routes/quote.routes.js";
 import analyticsRoutes from "./routes/analytics.routes.js";
+import { sendVerificationEmail } from "./mailtrap/emails.js";
 
 dotenv.config();
 
@@ -53,6 +54,15 @@ app.use(express.json()); // allows us to parse incoming requests:req.body
 app.use(cookieParser()); // allows us to parse incoming cookies
 
 app.get("/", (req, res) => res.send("bakcend root API working"));
+app.get("/test-email", async (req, res) => {
+	try {
+	  await sendVerificationEmail("aviralsingh3501@gmail.com", "123456");
+	  res.send("Test email sent!");
+	} catch (err) {
+	  res.status(500).send(err.message);
+	}
+  });
+  
 // API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/tasks", taskRoutes);

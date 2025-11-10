@@ -27,7 +27,7 @@ router.post("/logout", logout);
 // Common routes
 router.get("/check-auth", verifyToken, checkAuth);
 router.post("/verify-email", verifyEmail);
-router.post("/reset-password", resetPassword);
+router.post("/reset-password/:token", resetPassword);
 router.post("/forgot-password", forgotPassword);
 
 // Organizations list route
