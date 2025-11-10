@@ -9,11 +9,12 @@ export const generateTokenAndSetCookie = (res, userId) => {
 
 	
 	res.cookie("token", token, {
-		httpOnly: true, // Prevent client-side access to the cookie
-		secure: process.env.NODE_ENV === "production", // Use secure cookies in production
-		sameSite: "strict", // Prevent CSRF attacks by restricting cookie sending
-		maxAge: 7 * 24 * 60 * 60 * 1000, // Cookie expiration time (7 days)
-	});
+		httpOnly: true,
+		secure: true, // ✅ force HTTPS-only cookies always
+		sameSite: "none", // ✅ allow cross-origin
+		maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+	  });
+	  
 
 	return token; // Return the generated token
 };
