@@ -32,16 +32,20 @@ console.log("ALLOWD ORIGINS :",allowedOrigins)
 app.use(
 	cors({
 	  origin: function (origin, callback) {
-		// Allow requests with no origin (like mobile apps or curl)
-		if (!origin) return callback(null, true);
-		if (allowedOrigins.includes(origin)) return callback(null, true);
-		return callback(new Error("CORS blocked: " + origin));
+		if (!origin) return callback(null, true); // allow curl, Postman, etc.
+		if (allowedOrigins.includes(origin)) {
+		  // ✅ reflect exact allowed origin in response header
+		  return callback(null, origin);
+		}
+		return callback(new Error("CORS blocked for origin: " + origin));
 	  },
+	  credentials: true,
 	  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 	  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-	  credentials: true,
 	})
   );
+// ✅ Handle preflight OPTIONS requests globally
+app.options("*", cors());
 
 
 
