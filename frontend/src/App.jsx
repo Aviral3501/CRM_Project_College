@@ -29,6 +29,7 @@ import Notifications from './pages/notifications/Notifications';
 
 import { useAuthStore } from "./store/authStore";
 import { useUser } from "./context/UserContext";
+import HomePage from './pages/Home';
 
 // protect routes that require authentication
 const ProtectedRoute = ({ children }) => {
@@ -93,6 +94,7 @@ const App = () => {
 						<AdminSignupPage />
 					</RedirectAuthenticatedUser>
 				} />
+				<Route path='/home' element={<HomePage/>}/>
 				<Route path="/verify-email" element={<EmailVerificationPage />} />
 				<Route path="/forgot-password" element={<ForgotPasswordPage />} />
 				<Route path="/reset-password/:token" element={<ResetPasswordPage />} />

@@ -67,7 +67,6 @@ const App = () => {
         //     <Toaster />
         // </Router>
         <>
-        cvwklds
         </>
     );
 };
